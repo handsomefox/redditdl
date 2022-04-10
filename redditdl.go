@@ -193,12 +193,7 @@ func saveImage(i int, v image) error {
 		return errors.New("Status code is not 200")
 	}
 
-	filename := v.name + ".png"
-
-	filename, err = filenamify.Filenamify(filename, filenamify.Options{})
-	if err != nil {
-		filename = strconv.Itoa(i+1) + ".png"
-	}
+	filename := makeFilename(v.name, i)
 
 	file, err := os.Create(filename)
 	if err != nil {
@@ -222,4 +217,15 @@ func timer(total *uint64, finished *uint64, failed *uint64) {
 		}
 		time.Sleep(time.Millisecond * 100)
 	}
+}
+
+func makeFilename(name string, idx int) string {
+	str, err := filenamify.Filenamify(name, filenamify.Options{
+		MaxLength: 250,
+	})
+	str += ".png"
+	if err != nil {
+		str = strconv.Itoa(idx+1) + ".png"
+	}
+	return str
 }
