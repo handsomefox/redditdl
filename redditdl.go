@@ -135,7 +135,6 @@ func main() {
 			wg.Add(1)
 			err := saveImage(i, v)
 			if err != nil {
-				log.Println(err)
 				atomic.AddUint64(&failed, 1)
 			} else {
 				atomic.AddUint64(&finished, 1)
@@ -191,7 +190,7 @@ func saveImage(i int, v image) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		log.Print(errors.New("Status code is not 200"))
+		return errors.New("Status code is not 200")
 	}
 
 	filename := v.name + ".png"
