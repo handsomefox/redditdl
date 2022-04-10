@@ -12,6 +12,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/flytam/filenamify"
@@ -60,6 +62,18 @@ var (
 	directory string
 )
 
+// Global client
+var (
+	client *http.Client
+)
+
+type image struct {
+	url    string
+	name   string
+	width  float64
+	height float64
+}
+
 func main() {
 	sub := flag.String("sub", "wallpaper", "Subreddit name")
 	lim := flag.Int("count", 1, "Amount of posts to load")
@@ -75,51 +89,87 @@ func main() {
 	timeframe = *tf
 	directory = *dir
 
-	fmt.Printf("Using flags:\nSubreddit=%s, Limit=%d, Listing=%s, Timeframe=%s, Directory=%s\n\n", subreddit, limit, listing, timeframe, directory)
-
-	client := &http.Client{
+	client = &http.Client{
 		Transport: &http.Transport{
 			TLSNextProto: map[string]func(authority string, c *tls.Conn) http.RoundTripper{},
 		},
 		Timeout: 60 * time.Second,
 	}
 
-	url := fmt.Sprintf("https://www.reddit.com/r/%s/%s.json?limit=%d&t=%s", subreddit, listing, limit, timeframe)
-	request, err := http.NewRequest("GET", url, nil)
+	fmt.Printf("Using flags:\nSubreddit=%s, Limit=%d, Listing=%s, Timeframe=%s, Directory=%s\n\n",
+		subreddit, limit, listing, timeframe, directory)
+
+	url := fmt.Sprintf("https://www.reddit.com/r/%s/%s.json?limit=%d&t=%s",
+		subreddit, listing, limit, timeframe)
+	resp, err := fetchFromReddit(url)
 	if err != nil {
 		log.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		log.Fatalf("Error, status code: %d\nHeaders: %+v\n", resp.StatusCode, resp.Header)
+	}
+	defer resp.Body.Close()
+
+	fmt.Println("Decoding json...")
+	result, err := decodeJSON(resp.Body)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	images := toImages(result.Data.Children)
+
+	os.Mkdir(directory, os.ModePerm)
+	os.Chdir(directory)
+
+	fmt.Println("Downloading images.")
+	total := uint64(len(images))
+
+	var finished uint64
+	var failed uint64
+
+	go timer(&total, &finished, &failed)
+
+	wg := sync.WaitGroup{}
+	for i, v := range images {
+		go func(i int, v image) {
+			wg.Add(1)
+			err := saveImage(i, v)
+			if err != nil {
+				log.Println(err)
+				atomic.AddUint64(&failed, 1)
+			} else {
+				atomic.AddUint64(&finished, 1)
+			}
+			wg.Done()
+		}(i, v)
+	}
+
+	wg.Wait()
+	fmt.Println("\nDone!")
+}
+
+func fetchFromReddit(url string) (*http.Response, error) {
+	request, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
 	}
 	request.Header.Add("User-Agent", "go:getter")
 
 	fmt.Println("Requesting .json from reddit...")
-	resp, err := client.Do(request)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer resp.Body.Close()
+	return client.Do(request)
+}
 
-	if resp.StatusCode != http.StatusOK {
-		log.Fatalf("Error, status code: %d\nHeaders: %+v\n", resp.StatusCode, resp.Header)
-	}
-
-	fmt.Println("Decoding json...")
+func decodeJSON(r io.ReadCloser) (*Top, error) {
 	var result Top
-	decoder := json.NewDecoder(resp.Body)
-	err = decoder.Decode(&result)
-	if err != nil {
-		log.Fatal(err)
-	}
+	decoder := json.NewDecoder(r)
+	err := decoder.Decode(&result)
+	return &result, err
+}
 
-	type image struct {
-		url    string
-		name   string
-		width  float64
-		height float64
-	}
-
+func toImages(children []Child) []image {
 	images := make([]image, 0)
 
-	for _, v := range result.Data.Children {
+	for _, v := range children {
 		for _, v2 := range v.Data.Preview.Images {
 			v2.Source.URL = strings.Replace(v2.Source.URL, "&amp;s", "&s", 1)
 			images = append(images, image{
@@ -130,46 +180,47 @@ func main() {
 			})
 		}
 	}
+	return images
+}
 
-	os.Mkdir(directory, os.ModePerm)
-	os.Chdir(directory)
-
-	fmt.Println("Downloading images.")
-	total := len(images)
-	for i, v := range images {
-		fmt.Printf("\rCurrent: %d, Total: %d", i+1, total)
-		resp, err := client.Get(v.url)
-		if err != nil {
-			log.Print(err)
-			continue
-		}
-		defer resp.Body.Close()
-
-		if resp.StatusCode != 200 {
-			log.Print(errors.New("Status code is not 200"))
-			continue
-		}
-
-		filename := v.name + ".png"
-
-		filename, err = filenamify.Filenamify(filename, filenamify.Options{})
-		if err != nil {
-			filename = strconv.Itoa(i+1) + ".png"
-		}
-
-		file, err := os.Create(filename)
-		if err != nil {
-			log.Print(err)
-			continue
-		}
-		defer file.Close()
-
-		_, err = io.Copy(file, resp.Body)
-		if err != nil {
-			log.Print(err)
-			os.Remove(filename)
-			continue
-		}
+func saveImage(i int, v image) error {
+	resp, err := client.Get(v.url)
+	if err != nil {
+		return err
 	}
-	fmt.Println("\nDone!")
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		log.Print(errors.New("Status code is not 200"))
+	}
+
+	filename := v.name + ".png"
+
+	filename, err = filenamify.Filenamify(filename, filenamify.Options{})
+	if err != nil {
+		filename = strconv.Itoa(i+1) + ".png"
+	}
+
+	file, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	_, err = io.Copy(file, resp.Body)
+	if err != nil {
+		os.Remove(filename)
+		return err
+	}
+	return nil
+}
+
+func timer(total *uint64, finished *uint64, failed *uint64) {
+	for {
+		fmt.Printf("\rTotal: %d, Finished: %d, Failed: %d", *total, *finished, *failed)
+		if *total == (*finished + *failed) {
+			return
+		}
+		time.Sleep(time.Millisecond * 100)
+	}
 }

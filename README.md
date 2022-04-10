@@ -4,8 +4,9 @@ Downloads images from a subreddit in a batch.
 
 ## Usage
 
+```text
 Usage of redditdl:
-```bash
+
   -count int
         Amount of posts to load (default 1)
         
