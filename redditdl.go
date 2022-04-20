@@ -101,8 +101,8 @@ func main() {
 		Timeout: 60 * time.Second,
 	}
 
-	fmt.Printf("Using flags:\nSubreddit=%s, Limit=%d, Listing=%s, Timeframe=%s, Directory=%s\n\n",
-		subreddit, limit, listing, timeframe, directory)
+	fmt.Printf("Using flags:\nSubreddit=%s, Limit=%d, Listing=%s, Timeframe=%s, Directory=%s, Min Width=%v, Min Height=%v\n\n",
+		subreddit, limit, listing, timeframe, directory, minWidth, minHeight)
 
 	url := fmt.Sprintf("https://www.reddit.com/r/%s/%s.json?limit=%d&t=%s",
 		subreddit, listing, limit, timeframe)
