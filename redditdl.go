@@ -19,7 +19,7 @@ import (
 	"github.com/flytam/filenamify"
 )
 
-type Top struct {
+type RedditResponse struct {
 	Kind string `json:"kind"`
 	Data Data   `json:"data"`
 }
@@ -55,11 +55,12 @@ type Source struct {
 
 // Configuration
 var (
-	subreddit string
-	limit     int
-	listing   string
-	timeframe string
-	directory string
+	subreddit           string
+	limit               int
+	listing             string
+	timeframe           string
+	directory           string
+	minWidth, minHeight int
 )
 
 // Global client
@@ -80,6 +81,8 @@ func main() {
 	sort := flag.String("sort", "top", "How to sort (controversial, best, hot, new, random, rising, top)")
 	tf := flag.String("tf", "all", "Timeframe from which to get the posts (hour, day, week, month, year, all)")
 	dir := flag.String("dir", "images", "Specifies the directory where to download the images")
+	minX := flag.Int("x", 1920, "minimal width of the image to download")
+	minY := flag.Int("y", 1080, "minimal height of the image to download")
 
 	flag.Parse()
 
@@ -88,6 +91,8 @@ func main() {
 	listing = *sort
 	timeframe = *tf
 	directory = *dir
+	minWidth = *minX
+	minHeight = *minY
 
 	client = &http.Client{
 		Transport: &http.Transport{
@@ -131,8 +136,8 @@ func main() {
 
 	wg := sync.WaitGroup{}
 	for i, v := range images {
+		wg.Add(1)
 		go func(i int, v image) {
-			wg.Add(1)
 			err := saveImage(i, v)
 			if err != nil {
 				atomic.AddUint64(&failed, 1)
@@ -158,8 +163,8 @@ func fetchFromReddit(url string) (*http.Response, error) {
 	return client.Do(request)
 }
 
-func decodeJSON(r io.ReadCloser) (*Top, error) {
-	var result Top
+func decodeJSON(r io.ReadCloser) (*RedditResponse, error) {
+	var result RedditResponse
 	decoder := json.NewDecoder(r)
 	err := decoder.Decode(&result)
 	return &result, err
@@ -170,6 +175,9 @@ func toImages(children []Child) []image {
 
 	for _, v := range children {
 		for _, v2 := range v.Data.Preview.Images {
+			if v2.Source.Width < float64(minWidth) || v2.Source.Height < float64(minHeight) {
+				continue
+			}
 			v2.Source.URL = strings.Replace(v2.Source.URL, "&amp;s", "&s", 1)
 			images = append(images, image{
 				url:    v2.Source.URL,
@@ -190,7 +198,7 @@ func saveImage(i int, v image) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		return errors.New("Status code is not 200")
+		return errors.New("status code is not 200")
 	}
 
 	filename := makeFilename(v.name, i)
