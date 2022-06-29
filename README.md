@@ -2,6 +2,12 @@
 
 Downloads images from a subreddit in a batch.
 
+## Building
+
+```bash
+      go build --ldflags "-s -w" -o redditdl
+```
+
 ## Usage
 
 ```text
@@ -21,4 +27,10 @@ Usage of redditdl:
         minimal width of the image to download (default 1920)
   -y int
         minimal height of the image to download (default 1080)
+```
+
+## Example
+
+```bash
+      redditdl -count 5 -dir example
 ```
