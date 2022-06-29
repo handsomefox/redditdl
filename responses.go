@@ -23,7 +23,7 @@ type ChildData struct {
 	IsVideo   bool        `json:"is_video"`
 }
 
-type ResizedIcon struct {
+type ImageData struct {
 	URL    string `json:"url"`
 	Width  int64  `json:"width"`
 	Height int64  `json:"height"`
@@ -34,7 +34,15 @@ type Preview struct {
 }
 
 type Image struct {
-	Source      ResizedIcon   `json:"source"`
-	Resolutions []ResizedIcon `json:"resolutions"`
-	ID          string        `json:"id"`
+	Source      ImageData   `json:"source"`
+	Resolutions []ImageData `json:"resolutions"`
+	ID          string      `json:"id"`
+}
+
+// filteredImage represents the image information which is required to filter by resolution, download and store it.
+type filteredImage struct {
+	url    string
+	name   string
+	width  int64
+	height int64
 }

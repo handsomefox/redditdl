@@ -1,7 +1,6 @@
 package main
 
 import (
-	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -11,12 +10,9 @@ import (
 	"net/http"
 	"os"
 	"strconv"
-	"strings"
 	"sync"
 	"sync/atomic"
-	"time"
 
-	"github.com/flytam/filenamify"
 	"golang.org/x/exp/slices"
 )
 
@@ -26,213 +22,172 @@ var (
 	sorting   string
 	timeframe string
 	directory string
-
 	count     int
 	minWidth  int
 	minHeight int
 )
 
 func init() {
-	sub := flag.String("sub", "wallpaper", "Subreddit name")
-	sort := flag.String("sort", "top", "How to sort (controversial, best, hot, new, random, rising, top)")
-	tf := flag.String("tf", "all", "Timeframe from which to get the posts (hour, day, week, month, year, all)")
-	dir := flag.String("dir", "images", "Specifies the directory where to download the images")
-
-	cnt := flag.Int("count", 1, "Amount of images to download")
-	minX := flag.Int("x", 1920, "minimal width of the image to download")
-	minY := flag.Int("y", 1080, "minimal height of the image to download")
+	subFlag := flag.String("sub", "wallpaper", "Subreddit name")
+	sortFlag := flag.String("sort", "top", "How to sort (controversial, best, hot, new, random, rising, top)")
+	timeframeFlag := flag.String("tf", "all", "Timeframe from which to get the posts (hour, day, week, month, year, all)")
+	directoryFlag := flag.String("dir", "images", "Specifies the directory where to download the images")
+	countFlag := flag.Int("count", 1, "Amount of images to download")
+	minWidthFlag := flag.Int("x", 1920, "minimal width of the image to download")
+	minHeightFlag := flag.Int("y", 1080, "minimal height of the image to download")
 
 	flag.Parse()
 
-	subreddit = *sub
-	sorting = *sort
-	timeframe = *tf
-	directory = *dir
-
-	count = *cnt
-	minWidth = *minX
-	minHeight = *minY
+	subreddit = *subFlag
+	sorting = *sortFlag
+	timeframe = *timeframeFlag
+	directory = *directoryFlag
+	count = *countFlag
+	minWidth = *minWidthFlag
+	minHeight = *minHeightFlag
 }
 
-// filteredImage represents the image information which is required to filter by resolution, download and store it.
-type filteredImage struct {
-	url    string
-	name   string
-	width  int64
-	height int64
-}
-
-// createClient returns a pointer to http.Client configured to work with reddit.
-func createClient() *http.Client {
-	return &http.Client{
-		Transport: &http.Transport{
-			TLSNextProto: map[string]func(authority string, c *tls.Conn) http.RoundTripper{},
-		},
-		Timeout: 60 * time.Second,
-	}
-}
+var client *http.Client = createClient()
 
 func main() {
-	fmt.Printf("Using flags:\nSubreddit=%s, Limit=%d, Listing=%s, Timeframe=%s, Directory=%s, Min Width=%v, Min Height=%v\n",
+	log.Printf("Using flags:\nSubreddit=%s, Limit=%d, Listing=%s, Timeframe=%s, Directory=%s, Min Width=%v, Min Height=%v\n",
 		subreddit, count, sorting, timeframe, directory, minWidth, minHeight)
 
 	url := fmt.Sprintf("https://www.reddit.com/r/%s/%s.json?limit=%d&t=%s",
 		subreddit, sorting, count, timeframe)
 
-	resp, err := fetchFromReddit(url)
+	resp, err := fetchURL(url)
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("Fetching from reddit failed, error: %v, URL: %v\n", err, url)
 	}
 	if resp.StatusCode != http.StatusOK {
-		log.Fatalf("Error, status code: %d\nHeaders: %+v\n", resp.StatusCode, resp.Header)
+		log.Printf("Unexpected status in response: %v\n", http.StatusText(resp.StatusCode))
 	}
 	defer resp.Body.Close()
 
-	fmt.Println("Decoding json...")
+	log.Println("Decoding json...")
 
-	var result Posts
-	decoder := json.NewDecoder(resp.Body)
-	err = decoder.Decode(&result)
-	if err != nil {
-		log.Fatal(err)
+	result := new(Posts)
+	if err := json.NewDecoder(resp.Body).Decode(result); err != nil {
+		log.Fatal("Error decoding response: " + err.Error())
 	}
 
-	images := toImages(result.Data.Children)
+	images := postsToImages(result)
 
 	if len(images) < int(count) {
 		// If we didn't get the desired amount of images,
 		// we will continue fetching images from the next page,
-		// until we run out of pages
+		// until we run out of pages or get the needed amount of images.
+
+		// after is the id of last post
 		lastAfter := result.Data.After
+
 		finished := false
-		for {
-			currURL := url + "&after=" + lastAfter + "&count=" + strconv.Itoa(count)
+		for !finished {
+			currentURL := url + "&after=" + lastAfter + "&count=" + strconv.Itoa(count)
 
-			resp, err := fetchFromReddit(currURL)
+			resp, err := fetchURL(currentURL)
 			if err != nil {
-				fmt.Printf("Couldn't fetch more images, error: %v\n", err)
+				log.Printf("Fetching from reddit failed, error: %v, URL: %v\n", err, currentURL)
 				continue
-
 			}
 			if resp.StatusCode != http.StatusOK {
-				fmt.Printf("Couldn't fetch more images, status code: %v\n", resp.StatusCode)
+				log.Printf("Unexpected status in response: %v\n", http.StatusText(resp.StatusCode))
 				continue
 			}
 			defer resp.Body.Close()
 
-			fmt.Println("Decoding json from the next page...")
+			log.Println("Decoding json for the next page...")
 
-			var result Posts
-			decoder := json.NewDecoder(resp.Body)
-			err = decoder.Decode(&result)
-			if err != nil {
-				fmt.Printf("Couldn't decode this page json: %v\n", err)
+			result := new(Posts)
+			if err := json.NewDecoder(resp.Body).Decode(result); err != nil {
+				log.Fatal("Error decoding response: " + err.Error())
 				continue
 			}
+
 			if len(result.Data.Children) == 0 || result.Data.After == lastAfter {
-				fmt.Println("We can't load any more posts :/")
+				log.Println("There's no more posts to load")
 			}
+
 			lastAfter = result.Data.After
-
 			if len(lastAfter) == 0 {
-				fmt.Println("There's probably something wrong with the request")
-				break
+				log.Println("There's probably something wrong with the request, maybe we got rate limited")
+				finished = true
 			}
 
-			newImages := toImages(result.Data.Children)
-			for _, v := range newImages {
+			nextPageImages := postsToImages(result)
+
+			// Fill until we get the desired amount
+			for _, image := range nextPageImages {
 				if len(images) >= int(count) {
 					finished = true
-					break
 				}
-				if slices.Contains(images, v) {
+				// Ignore duplicates
+				if slices.Contains(images, image) {
 					continue
 				}
-				images = append(images, v)
-			}
-			if finished {
-				break
+				images = append(images, image)
 			}
 		}
 	}
 
-	os.Mkdir(directory, os.ModePerm)
-	os.Chdir(directory)
+	if err := os.Mkdir(directory, os.ModePerm); err != nil {
+		if !errors.Is(err, os.ErrExist) {
+			log.Fatalf("Error creating a directory for images, error: %v, directory: %v\n", err, directory)
+		} else {
+			log.Print("Directory already exists, but we will still continue")
+		}
+	}
+	if err := os.Chdir(directory); err != nil {
+		log.Fatalf("Error navigating to directory, error: %v, directory: %v\n", err, directory)
+	}
 
-	fmt.Println("Downloading images:")
-	total := uint64(len(images)) - 1
-
+	log.Println("Started downloading images")
 	var (
-		finished, failed uint64
+		total    = uint32(len(images))
+		finished uint32
+		failed   uint32
 	)
 
-	go timer(&total, &finished, &failed)
+	wg := new(sync.WaitGroup)
+	go printDownloadStatus(&total, &finished, &failed)
 
-	client := createClient()
-	wg := sync.WaitGroup{}
 	for i, v := range images {
 		wg.Add(1)
-		go func(client *http.Client, i int, v filteredImage) {
-			err := saveImage(client, i, v)
-			if err != nil {
-				atomic.AddUint64(&failed, 1)
+		go func(client *http.Client, index int, imageData filteredImage) {
+			if err := downloadToDisk(index, imageData); err != nil {
+				atomic.AddUint32(&failed, 1)
 			} else {
-				atomic.AddUint64(&finished, 1)
+				atomic.AddUint32(&finished, 1)
 			}
 			wg.Done()
 		}(client, i, v)
 	}
-
 	wg.Wait()
-	fmt.Println("\nFinished downloading all the images!")
 }
 
-// fetchFromReddit fetches a json file from reddit containing information about posts using the given url.
-func fetchFromReddit(url string) (*http.Response, error) {
+// fetchURL fetches a json file from reddit containing information about posts using the given url.
+func fetchURL(url string) (*http.Response, error) {
 	request, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
 	request.Header.Add("User-Agent", "go:getter")
+	// log.Println("Requesting .json from reddit...")
 
-	fmt.Println("Requesting .json from reddit...")
-
-	client := createClient()
 	return client.Do(request)
 }
 
-// toImages converts an array of children that contain images to an array of filteredImage(s)
-// it also filters by specified resolution, everything smaller than the specified resolution is not downloaded
-func toImages(children []Child) []filteredImage {
-	images := make([]filteredImage, 0)
-
-	for _, v := range children {
-		for _, v2 := range v.Data.Preview.Images {
-			if v2.Source.Width < int64(minWidth) || v2.Source.Height < int64(minHeight) {
-				continue
-			}
-			v2.Source.URL = strings.Replace(v2.Source.URL, "&amp;s", "&s", 1)
-			images = append(images, filteredImage{
-				url:    v2.Source.URL,
-				name:   v.Data.Title,
-				width:  v2.Source.Width,
-				height: v2.Source.Width,
-			})
-		}
-	}
-	return images
-}
-
-// saveImage downloads the image and stores it in the specified directory.
-func saveImage(client *http.Client, i int, v filteredImage) error {
+// downloadToDisk downloads the image and stores it in the specified directory.
+func downloadToDisk(i int, v filteredImage) error {
 	resp, err := client.Get(v.url)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != 200 {
-		return errors.New("status code is not 200")
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("unexpected status in response: %v", http.StatusText(resp.StatusCode))
 	}
 
 	filename := createFilename(v.name, i)
@@ -249,49 +204,4 @@ func saveImage(client *http.Client, i int, v filteredImage) error {
 		return err
 	}
 	return nil
-}
-
-// timer is a background timer waiting for all the images to finish loading
-func timer(total *uint64, finished *uint64, failed *uint64) {
-	for {
-		fmt.Printf("\rTotal images found in posts: %d, Finished: %d, Failed: %d", *total, *finished, *failed)
-		if *total == (*finished + *failed) {
-			return
-		}
-		time.Sleep(time.Millisecond * 100)
-	}
-}
-
-// createFilename generates a valid filename for the image.
-func createFilename(name string, idx int) string {
-	str, err := filenamify.Filenamify(name, filenamify.Options{
-		MaxLength: 250,
-	})
-	str += ".png"
-
-	if err != nil {
-		str = strconv.Itoa(idx+1) + ".png"
-	}
-
-	for fileExists(str) {
-		newName := name + strconv.Itoa(idx)
-		str, err = filenamify.Filenamify(newName, filenamify.Options{
-			MaxLength: 240,
-		})
-		str += ".png"
-
-		if err != nil {
-			str = strconv.Itoa(idx+1) + ".png"
-		}
-	}
-
-	return str
-}
-
-func fileExists(filename string) bool {
-	info, err := os.Stat(filename)
-	if os.IsNotExist(err) {
-		return false
-	}
-	return !info.IsDir()
 }
