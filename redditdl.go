@@ -168,18 +168,19 @@ func main() {
 
 	go timer(&total, &finished, &failed)
 
+	client := createClient()
 	wg := sync.WaitGroup{}
 	for i, v := range images {
 		wg.Add(1)
-		go func(i int, v filteredImage) {
-			err := saveImage(i, v)
+		go func(client *http.Client, i int, v filteredImage) {
+			err := saveImage(client, i, v)
 			if err != nil {
 				atomic.AddUint64(&failed, 1)
 			} else {
 				atomic.AddUint64(&finished, 1)
 			}
 			wg.Done()
-		}(i, v)
+		}(client, i, v)
 	}
 
 	wg.Wait()
@@ -223,8 +224,7 @@ func toImages(children []Child) []filteredImage {
 }
 
 // saveImage downloads the image and stores it in the specified directory.
-func saveImage(i int, v filteredImage) error {
-	client := createClient()
+func saveImage(client *http.Client, i int, v filteredImage) error {
 	resp, err := client.Get(v.url)
 	if err != nil {
 		return err
@@ -254,7 +254,7 @@ func saveImage(i int, v filteredImage) error {
 // timer is a background timer waiting for all the images to finish loading
 func timer(total *uint64, finished *uint64, failed *uint64) {
 	for {
-		fmt.Printf("\rTotal images found in posts: %d, Finished: %d, Failed: %d", *total+1, *finished, *failed)
+		fmt.Printf("\rTotal images found in posts: %d, Finished: %d, Failed: %d", *total, *finished, *failed)
 		if *total == (*finished + *failed) {
 			return
 		}
@@ -268,8 +268,30 @@ func createFilename(name string, idx int) string {
 		MaxLength: 250,
 	})
 	str += ".png"
+
 	if err != nil {
 		str = strconv.Itoa(idx+1) + ".png"
 	}
+
+	for fileExists(str) {
+		newName := name + strconv.Itoa(idx)
+		str, err = filenamify.Filenamify(newName, filenamify.Options{
+			MaxLength: 240,
+		})
+		str += ".png"
+
+		if err != nil {
+			str = strconv.Itoa(idx+1) + ".png"
+		}
+	}
+
 	return str
+}
+
+func fileExists(filename string) bool {
+	info, err := os.Stat(filename)
+	if os.IsNotExist(err) {
+		return false
+	}
+	return !info.IsDir()
 }
