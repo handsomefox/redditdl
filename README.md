@@ -5,7 +5,7 @@ Downloads images from a subreddit in a batch.
 ## Building
 
 ```bash
-      go build --ldflags "-s -w" -o redditdl
+go build --ldflags "-s -w" -o redditdl
 ```
 
 ## Usage
@@ -32,5 +32,5 @@ Usage of redditdl:
 ## Example
 
 ```bash
-      redditdl -count 5 -dir example
+redditdl -count 5 -dir example
 ```
