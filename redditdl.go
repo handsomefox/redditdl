@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/flytam/filenamify"
+	"golang.org/x/exp/slices"
 )
 
 // Configuration
@@ -105,7 +106,7 @@ func main() {
 		lastAfter := result.Data.After
 		finished := false
 		for {
-			currURL := url + "?after=" + lastAfter
+			currURL := url + "&after=" + lastAfter + "&count=" + strconv.Itoa(count)
 
 			resp, err := fetchFromReddit(currURL)
 			if err != nil {
@@ -128,6 +129,10 @@ func main() {
 				fmt.Printf("Couldn't decode this page json: %v\n", err)
 				continue
 			}
+			if result.Data.After == lastAfter {
+				fmt.Println("We can't load any more posts :/")
+				break
+			}
 			lastAfter = result.Data.After
 
 			if len(lastAfter) == 0 {
@@ -140,6 +145,9 @@ func main() {
 				if len(images) >= int(count) {
 					finished = true
 					break
+				}
+				if slices.Contains(images, v) {
+					continue
 				}
 				images = append(images, v)
 			}
@@ -247,7 +255,7 @@ func saveImage(i int, v filteredImage) error {
 // timer is a background timer waiting for all the images to finish loading
 func timer(total *uint64, finished *uint64, failed *uint64) {
 	for {
-		fmt.Printf("\rTotal images found in posts: %d, Finished: %d, Failed: %d", *total, *finished, *failed)
+		fmt.Printf("\rTotal images found in posts: %d, Finished: %d, Failed: %d", *total+1, *finished, *failed)
 		if *total == (*finished + *failed) {
 			return
 		}
