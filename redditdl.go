@@ -129,9 +129,8 @@ func main() {
 				fmt.Printf("Couldn't decode this page json: %v\n", err)
 				continue
 			}
-			if result.Data.After == lastAfter {
+			if len(result.Data.Children) == 0 || result.Data.After == lastAfter {
 				fmt.Println("We can't load any more posts :/")
-				break
 			}
 			lastAfter = result.Data.After
 
