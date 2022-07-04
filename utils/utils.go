@@ -24,7 +24,7 @@ func CreateClient() *http.Client {
 		Transport: &http.Transport{
 			TLSNextProto: map[string]func(authority string, c *tls.Conn) http.RoundTripper{},
 		},
-		Timeout: 5 * time.Second,
+		Timeout: 60 * time.Second,
 	}
 }
 
@@ -48,11 +48,8 @@ func CreateFilename(name string, idx int) (string, error) {
 
 // FileExists returns whether the file exists
 func FileExists(filename string) bool {
-	info, err := os.Stat(filename)
-	if os.IsNotExist(err) {
-		return false
-	}
-	return !info.IsDir()
+	_, err := os.Stat(filename)
+	return os.IsExist(err)
 }
 
 // formatFilename ensures that the filename is valid for NTFS and has the right extension
