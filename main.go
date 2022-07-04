@@ -175,7 +175,13 @@ func downloadImage(i int, v FinalImage) error {
 		return fmt.Errorf("unexpected status in response: %v", http.StatusText(response.StatusCode))
 	}
 
-	filename, err := utils.CreateFilename(v.Name, i)
+	filenameAndExtension := strings.Split(response.Request.URL.Path, ".")
+	extension := "jpeg"
+	if len(filenameAndExtension) == 2 {
+		extension = filenameAndExtension[1]
+	}
+
+	filename, err := utils.CreateFilename(v.Name+"."+extension, i)
 	if err != nil {
 		return fmt.Errorf("error when downloading to disk: %v", err)
 	}
