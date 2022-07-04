@@ -39,10 +39,8 @@ type Image struct {
 	ID          string      `json:"id"`
 }
 
-// filteredImage represents the image information which is required to filter by resolution, download and store it.
-type filteredImage struct {
-	url    string
-	name   string
-	width  int64
-	height int64
+// FinalImage represents the image information which is required to filter by resolution, download and store it.
+type FinalImage struct {
+	Name string
+	Data ImageData
 }
