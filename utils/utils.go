@@ -14,6 +14,7 @@ import (
 var (
 	ErrInvalidFilenameSyntax = errors.New("invalid filename syntax")
 	ErrEmptyFilename         = errors.New("empty filename")
+	ErrEmptyExtension        = errors.New("empty extension")
 )
 
 const NTFS_MAX_FILENAME_LENGTH = 256
@@ -29,15 +30,15 @@ func CreateClient() *http.Client {
 }
 
 // CreateFilename generates a valid filename for the image.
-func CreateFilename(name string, idx int) (string, error) {
-	formatted, err := formatFilename(name)
+func CreateFilename(name, extension string, idx int) (string, error) {
+	formatted, err := formatFilename(name, extension)
 	if err != nil {
 		return "", fmt.Errorf("error creating filename (%v): %v", name, err)
 	}
 
 	// Resoulve dupicates
 	for i := 0; FileExists(formatted); i++ {
-		formatted, err = formatFilename("(" + strconv.Itoa(i) + ") " + name)
+		formatted, err = formatFilename("("+strconv.Itoa(idx)+") "+name, extension)
 		if err != nil {
 			return "", fmt.Errorf("error creating filename (%v): %v", name, err)
 		}
@@ -53,18 +54,16 @@ func FileExists(filename string) bool {
 }
 
 // formatFilename ensures that the filename is valid for NTFS and has the right extension
-func formatFilename(fullFilename string) (string, error) {
-	nameAndExt := strings.Split(fullFilename, ".")
-	if len(nameAndExt) != 2 {
-		return "", fmt.Errorf("%v: %v", ErrInvalidFilenameSyntax, fullFilename)
-	}
-
-	filename := nameAndExt[0]
-	extension := nameAndExt[1]
-
+func formatFilename(filename, extension string) (string, error) {
 	if len(filename) == 0 {
 		return "", ErrEmptyFilename
 	}
+
+	if len(extension) == 0 {
+		return "", ErrEmptyExtension
+	}
+
+	filename = removeForbiddenChars(filename)
 
 	totalLength := len(filename) + len(extension) + 1
 	if totalLength > NTFS_MAX_FILENAME_LENGTH {
@@ -75,4 +74,15 @@ func formatFilename(fullFilename string) (string, error) {
 	}
 
 	return filename + "." + extension, nil
+}
+
+var forbiddenChars = []string{"/", "<", ">", ":", "\"", "\\", "|", "?", "*"}
+
+// removeForbiddenChars removes invalid charactes for Linux/Windows filenames
+func removeForbiddenChars(name string) string {
+	result := name
+	for _, c := range forbiddenChars {
+		result = strings.ReplaceAll(result, c, " ")
+	}
+	return result
 }

@@ -176,12 +176,12 @@ func downloadImage(i int, v FinalImage) error {
 	}
 
 	filenameAndExtension := strings.Split(response.Request.URL.Path, ".")
-	extension := "jpeg"
+	extension := "jpg"
 	if len(filenameAndExtension) == 2 {
 		extension = filenameAndExtension[1]
 	}
 
-	filename, err := utils.CreateFilename(v.Name+"."+extension, i)
+	filename, err := utils.CreateFilename(v.Name, extension, i)
 	if err != nil {
 		return fmt.Errorf("error when downloading to disk: %v", err)
 	}
