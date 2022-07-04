@@ -49,6 +49,7 @@ func main() {
 // a slice of FinalImages that were filtered
 func getImages(URL string, count int) ([]FinalImage, error) {
 	// Fetch required data
+	log.Println("Fetching posts...")
 	posts, err := getPosts(URL)
 	if err != nil {
 		return nil, fmt.Errorf("error gettings posts: %v, URL: %v", err, URL)
@@ -64,6 +65,7 @@ func getImages(URL string, count int) ([]FinalImage, error) {
 		finished := false
 
 		for !finished {
+			log.Println("Fetching posts...")
 			currentURL := URL + "&after=" + lastAfter + "&count=" + strconv.Itoa(count)
 			posts, err := getPosts(currentURL)
 			if err != nil {
