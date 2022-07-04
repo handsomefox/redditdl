@@ -23,10 +23,10 @@ Usage of redditdl:
         Subreddit name (default "wallpaper")
   -tf string
         Timeframe from which to get the posts (hour, day, week, month, year, all) (default "all")
-  -x int
-        minimal width of the image to download (default 1920)
-  -y int
-        minimal height of the image to download (default 1080)
+  -width int
+        minimal width of the image to download (default 0)
+  -height int
+        minimal height of the image to download (default 0)
 ```
 
 ## Example
