@@ -67,9 +67,7 @@ func formatFilename(filename, extension string) (string, error) {
 
 	totalLength := len(filename) + len(extension) + 1
 	if totalLength > NTFS_MAX_FILENAME_LENGTH {
-		fmt.Println(totalLength)
 		requiredLength := NTFS_MAX_FILENAME_LENGTH - len(extension) - 1
-		fmt.Println(requiredLength)
 		filename = filename[:requiredLength]
 	}
 
