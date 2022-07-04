@@ -4,12 +4,16 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
 	"time"
+)
+
+var (
+	ErrInvalidFilenameSyntax = errors.New("invalid filename syntax")
+	ErrEmptyFilename         = errors.New("empty filename")
 )
 
 const NTFS_MAX_FILENAME_LENGTH = 256
@@ -74,19 +78,4 @@ func formatFilename(fullFilename string) (string, error) {
 	}
 
 	return filename + "." + extension, nil
-}
-
-// NavigateToDirectory changes directory to the provided one and creates it if needed
-func NavigateToDirectory(directory string) error {
-	if err := os.Mkdir(directory, os.ModePerm); err != nil {
-		if !errors.Is(err, os.ErrExist) {
-			return fmt.Errorf("error creating a directory for images, %v", err)
-		} else {
-			log.Print("Directory already exists, but we will still continue")
-		}
-	}
-	if err := os.Chdir(directory); err != nil {
-		return fmt.Errorf("error navigating to directory, %v", err)
-	}
-	return nil
 }
