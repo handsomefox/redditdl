@@ -5,7 +5,7 @@ Downloads images from a subreddit in a batch.
 ## Building
 
 ```bash
-go build --ldflags "-s -w" -o
+go build --ldflags "-s -w" -o redditdl
 ```
 
 ## Usage
