@@ -1,4 +1,4 @@
-package main
+package downloader
 
 type Posts struct {
 	Kind string    `json:"kind"`
@@ -37,10 +37,4 @@ type Image struct {
 	Source      ImageData   `json:"source"`
 	Resolutions []ImageData `json:"resolutions"`
 	ID          string      `json:"id"`
-}
-
-// FinalImage represents the image information which is required to filter by resolution, download and store it.
-type FinalImage struct {
-	Name string
-	Data ImageData
 }

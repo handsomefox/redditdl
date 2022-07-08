@@ -17,7 +17,7 @@ var (
 	ErrEmptyExtension        = errors.New("empty extension")
 )
 
-const NTFS_MAX_FILENAME_LENGTH = 256
+const NtfsMaxFilenameLength = 256
 
 // CreateClient returns a pointer to http.Client configured to work with reddit.
 func CreateClient() *http.Client {
@@ -36,7 +36,7 @@ func CreateFilename(name, extension string, idx int) (string, error) {
 		return "", fmt.Errorf("error creating filename (%v): %v", name, err)
 	}
 
-	// Resoulve dupicates
+	// Resolve duplicates
 	for i := 0; FileExists(formatted); i++ {
 		formatted, err = formatFilename("("+strconv.Itoa(idx)+") "+name, extension)
 		if err != nil {
@@ -66,8 +66,8 @@ func formatFilename(filename, extension string) (string, error) {
 	filename = removeForbiddenChars(filename)
 
 	totalLength := len(filename) + len(extension) + 1
-	if totalLength > NTFS_MAX_FILENAME_LENGTH {
-		requiredLength := NTFS_MAX_FILENAME_LENGTH - len(extension) - 1
+	if totalLength > NtfsMaxFilenameLength {
+		requiredLength := NtfsMaxFilenameLength - len(extension) - 1
 		filename = filename[:requiredLength]
 	}
 
@@ -76,7 +76,7 @@ func formatFilename(filename, extension string) (string, error) {
 
 var forbiddenChars = []string{"/", "<", ">", ":", "\"", "\\", "|", "?", "*"}
 
-// removeForbiddenChars removes invalid charactes for Linux/Windows filenames
+// removeForbiddenChars removes invalid characters for Linux/Windows filenames
 func removeForbiddenChars(name string) string {
 	result := name
 	for _, c := range forbiddenChars {

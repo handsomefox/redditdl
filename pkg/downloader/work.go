@@ -1,16 +1,14 @@
-package main
+package downloader
 
 import (
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"redditdl/config"
 	"redditdl/utils"
-	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -19,74 +17,43 @@ import (
 	"golang.org/x/exp/slices"
 )
 
-var client = utils.CreateClient()
-
-func main() {
-	// Print the configuration
-	log.Printf("Using parameters: Subreddit=%s, Limit=%d, Listing=%s, Timeframe=%s, Directory=%s, Min Width=%v, Min Height=%v\n",
-		config.Subreddit, config.Count, config.Sorting, config.Timeframe,
-		config.Directory, config.MinWidth, config.MinHeight)
-
-	// Format URL
-	url := fmt.Sprintf("https://www.reddit.com/r/%s/%s.json?limit=%d&t=%s",
-		config.Subreddit, config.Sorting, config.Count, config.Timeframe)
-
-	// Get required amount of images
-	images, err := getImages(url, config.Count)
+// getFilteredImages fetches and then returns a slice of filtered images according to the given configuration.
+func getFilteredImages(c config.Configuration) ([]FinalImage, error) {
+	logger.Debug("Fetching posts")
+	posts, err := getPosts(c)
 	if err != nil {
-		log.Fatalf("Error getting images from reddit: %v\n", err)
+		return nil, fmt.Errorf("error gettings posts: %v", err)
 	}
 
-	// Download the images
-	log.Println("Started downloading images")
-	if err := downloadImages(images, config.Directory); err != nil {
-		log.Fatalf("\nError downloading images: %v\n", err)
-	}
-	fmt.Println("\nFinished downloading!")
-}
-
-// getImages takes in a formatted reddit URL and an amount of images to download and returns
-// a slice of FinalImages that were filtered
-func getImages(URL string, count int) ([]FinalImage, error) {
-	// Fetch required data
-	log.Println("Fetching posts...")
-	posts, err := getPosts(URL)
-	if err != nil {
-		return nil, fmt.Errorf("error gettings posts: %v, URL: %v", err, URL)
-	}
-
-	// Filter the response
-	images := filterImages(posts, config.MinWidth, config.MinHeight)
+	images := filterImages(posts, c.MinWidth, c.MinHeight)
 
 	// Continue fetching data until we get the required amount of images
-	if len(images) < int(count) {
-		// after is the id of last post
-		lastAfter := posts.Data.After
+	if len(images) < c.Count {
 		finished := false
+		c.After = posts.Data.After
 
 		for !finished {
-			log.Println("Fetching posts...")
-			currentURL := URL + "&after=" + lastAfter + "&count=" + strconv.Itoa(count)
-			posts, err := getPosts(currentURL)
+			logger.Debug("Fetching posts...")
+			posts, err := getPosts(c)
 			if err != nil {
-				return nil, fmt.Errorf("error gettings posts for the next page: %v, URL: %v", err, currentURL)
+				return nil, fmt.Errorf("error gettings posts for the next page: %v", err)
 			}
 
-			if len(posts.Data.Children) == 0 || posts.Data.After == lastAfter {
-				log.Println("There's no more posts to load")
+			if len(posts.Data.Children) == 0 || posts.Data.After == c.After {
+				logger.Debug("There's no more posts to load")
 			}
 
-			lastAfter = posts.Data.After
-			if len(lastAfter) == 0 {
-				log.Println("There's probably something wrong with the request, maybe we got rate limited")
+			c.After = posts.Data.After
+			if len(c.After) == 0 {
+				logger.Debug("There's probably something wrong with the request, maybe we got rate limited")
 				finished = true
 			}
 
-			nextPageImages := filterImages(posts, config.MinWidth, config.MinHeight)
+			nextPageImages := filterImages(posts, c.MinWidth, c.MinHeight)
 
 			// Fill until we get the desired amount
 			for _, image := range nextPageImages {
-				if len(images) >= int(count) {
+				if len(images) >= c.Count {
 					finished = true
 				}
 				// Ignore duplicates
@@ -100,29 +67,27 @@ func getImages(URL string, count int) ([]FinalImage, error) {
 			time.Sleep(5 * time.Second)
 		}
 	}
-	return ensureLength(images, config.Count), nil
+	return ensureLength(images, c.Count), nil
 }
 
 // downloadImages takes a slice of FinalImages and a directory string and tries to download every image
-// to the specificed directory, it does not stop if a single download fails
-func downloadImages(images []FinalImage, directory string) error {
+// to the specified directory, it does not stop if a single download fails.
+func downloadImages(images []FinalImage, c config.Configuration) (int, error) {
 	// Create and move to the specified directory
-	err := navigateToDirectory(directory)
+	err := navigateToDirectory(c.Directory)
 	if err != nil {
-		return fmt.Errorf("failed to navigate to directory, error: %v, directory: %v", err, directory)
+		return 0, fmt.Errorf("failed to navigate to directory, error: %v, directory: %v", err, c.Directory)
 	}
 
-	var (
-		total    = uint32(len(images))
-		finished uint32
-		failed   uint32
-	)
+	var total, finished, failed uint32
+	total = uint32(len(images))
+
+	if c.ShowProgress {
+		printDownloadStatus(&total, &finished, &failed)
+	}
 
 	wg := new(sync.WaitGroup)
-	// this will print the download progress in the background
-	printDownloadStatus(&total, &finished, &failed)
-
-	// this is the loop which actually downloads the images
+	// The loop which downloads the images.
 	for i, v := range images {
 		wg.Add(1)
 		go func(client *http.Client, index int, imageData FinalImage) {
@@ -135,22 +100,29 @@ func downloadImages(images []FinalImage, directory string) error {
 		}(client, i, v)
 	}
 	wg.Wait()
-	return nil
+
+	return int(finished), nil
 }
 
-// getPosts fetches a json file from reddit containing information about the posts.
-func getPosts(url string) (*Posts, error) {
-	request, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return nil, fmt.Errorf("error creating a request: %v", err)
+// getPosts fetches a json file from reddit containing information about the posts using the given configuration.
+func getPosts(c config.Configuration) (*Posts, error) {
+	URL := fmt.Sprintf("https://www.reddit.com/r/%s/%s.json?limit=%d&t=%s",
+		c.Subreddit, c.Sorting, c.Count, c.Timeframe)
+
+	if len(c.After) > 0 {
+		URL = fmt.Sprintf("%s&after=%s&count=%d", URL, c.After, c.Count)
 	}
 
+	request, err := http.NewRequest("GET", URL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("error creating a request: %v, URL: %v", err, URL)
+	}
 	request.Header.Add("User-Agent", "go:getter")
+
 	response, err := client.Do(request)
 	if err != nil {
-		return nil, fmt.Errorf("fetching from reddit failed, error: %v, URL: %v", err, url)
+		return nil, fmt.Errorf("fetching from reddit failed, error: %v, URL: %v", err, URL)
 	}
-
 	defer response.Body.Close()
 
 	if response.StatusCode != http.StatusOK {
@@ -196,13 +168,15 @@ func downloadImage(i int, v FinalImage) error {
 
 	_, err = io.Copy(file, response.Body)
 	if err != nil {
-		os.Remove(filename)
+		if err := os.Remove(filename); err != nil {
+			return fmt.Errorf("error when deleting the created file after a failed copy: %v", err)
+		}
 		return fmt.Errorf("error when copying the file to disk: %v", err)
 	}
 	return nil
 }
 
-// filterImages converts images inside the posts to FinalImages and filters them by specified resolution
+// filterImages converts images inside the posts to FinalImages and filters them by specified resolution.
 func filterImages(posts *Posts, minWidth, minHeight int) []FinalImage {
 	images := make([]FinalImage, 0)
 	for _, post := range posts.Data.Children {
@@ -224,19 +198,20 @@ func filterImages(posts *Posts, minWidth, minHeight int) []FinalImage {
 	return images
 }
 
-// printDownloadStatus is a background thread that prints the download status
+// printDownloadStatus is a background thread that prints the download status.
 func printDownloadStatus(total *uint32, finished *uint32, failed *uint32) {
 	go func(total, finished, failed *uint32) {
 		for {
 			fmt.Printf("\rTotal images: %d, Finished: %d, Failed: %d", *total, *finished, *failed)
 			if *total == (*finished + *failed) {
+				fmt.Println()
 				return
 			}
 		}
 	}(total, finished, failed)
 }
 
-// ensureLength ensures that the total amount of posts is the same as the one specified in the config
+// ensureLength ensures that the total amount of posts is the same as the one specified in the configuration.
 func ensureLength(posts []FinalImage, requiredLength int) []FinalImage {
 	if len(posts) > requiredLength {
 		return posts[:requiredLength]
@@ -244,13 +219,13 @@ func ensureLength(posts []FinalImage, requiredLength int) []FinalImage {
 	return posts
 }
 
-// navigateToDirectory moves to the provided directory and creates it if neccessary
+// navigateToDirectory moves to the provided directory and creates it if necessary.
 func navigateToDirectory(directory string) error {
 	if err := os.Mkdir(directory, os.ModePerm); err != nil {
 		if !errors.Is(err, os.ErrExist) {
 			return fmt.Errorf("error creating a directory for images, %v", err)
 		} else {
-			log.Print("Directory already exists, but we will still continue")
+			logger.Debug("Directory already exists, but we will still continue")
 		}
 	}
 	if err := os.Chdir(directory); err != nil {
