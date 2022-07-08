@@ -1,10 +1,11 @@
 package main
 
 import (
-	"go.uber.org/zap"
 	"redditdl/config"
 	"redditdl/pkg/downloader"
 	"redditdl/pkg/logging"
+
+	"go.uber.org/zap"
 )
 
 var logger *zap.SugaredLogger
