@@ -9,10 +9,10 @@ import (
 	"go.uber.org/zap"
 )
 
-// FinalImage represents the image information which is required to filter by resolution, download and store it.
-type FinalImage struct {
+// finalImage represents the image information which is required to filter by resolution, download and store it.
+type finalImage struct {
 	Name string
-	Data ImageData
+	Data imageData
 }
 
 var client = utils.CreateClient()

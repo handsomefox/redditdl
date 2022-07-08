@@ -1,40 +1,40 @@
 package downloader
 
-type Posts struct {
+type posts struct {
 	Kind string    `json:"kind"`
-	Data PostsData `json:"data"`
+	Data postsData `json:"data"`
 }
 
-type PostsData struct {
+type postsData struct {
 	After    string  `json:"after"`
-	Children []Child `json:"children"`
+	Children []child `json:"children"`
 }
 
-type Child struct {
+type child struct {
 	Kind string    `json:"kind"`
-	Data ChildData `json:"data"`
+	Data childData `json:"data"`
 }
 
-type ChildData struct {
+type childData struct {
 	Title     string      `json:"title"`
 	Thumbnail string      `json:"thumbnail"`
-	Preview   Preview     `json:"preview"`
+	Preview   preview     `json:"preview"`
 	Media     interface{} `json:"media"`
 	IsVideo   bool        `json:"is_video"`
 }
 
-type ImageData struct {
+type imageData struct {
 	URL    string `json:"url"`
 	Width  int64  `json:"width"`
 	Height int64  `json:"height"`
 }
 
-type Preview struct {
-	Images []Image `json:"images"`
+type preview struct {
+	Images []image `json:"images"`
 }
 
-type Image struct {
-	Source      ImageData   `json:"source"`
-	Resolutions []ImageData `json:"resolutions"`
+type image struct {
+	Source      imageData   `json:"source"`
+	Resolutions []imageData `json:"resolutions"`
 	ID          string      `json:"id"`
 }
