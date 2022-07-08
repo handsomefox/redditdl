@@ -1,26 +1,38 @@
 package config
 
-import "flag"
+import (
+	"flag"
+)
 
-// Configuration
-var (
+// Configuration is the parameters for the application
+type Configuration struct {
+	// Verbose turns the logging on or off
+	Verbose bool
+	// ShowProgress indicates whether the application will show the download progress
+	ShowProgress bool
 	// Subreddit name
 	Subreddit string
-	// How to sort the subreddit
+	// Sorting How to sort the subreddit
 	Sorting string
 	// Timeframe of the posts
 	Timeframe string
 	// Directory to download images to
 	Directory string
-	// Amount of images to download
+	// Count Amount of images to download
 	Count int
-	// Minimal width of the images
+	// MinWidth Minimal width of the images
 	MinWidth int
-	// Minimal height of the images
+	// MinHeight Minimal height of the images
 	MinHeight int
-)
+	// After is a post ID, which is used to fetch posts after that ID
+	After string
+}
+
+var spec Configuration
 
 func init() {
+	verbose := flag.Bool("verbose", false, "Turns the logging on or off")
+	showProgress := flag.Bool("progress", false, "Indicates whether the application will show the download progress")
 	subreddit := flag.String("sub", "wallpaper", "Subreddit name")
 	sorting := flag.String("sort", "top", "How to sort (controversial, best, hot, new, random, rising, top)")
 	timeframe := flag.String("tf", "all", "Timeframe from which to get the posts (hour, day, week, month, year, all)")
@@ -31,11 +43,17 @@ func init() {
 
 	flag.Parse()
 
-	Subreddit = *subreddit
-	Sorting = *sorting
-	Timeframe = *timeframe
-	Directory = *directory
-	Count = *count
-	MinWidth = *minWidth
-	MinHeight = *minHeight
+	spec.Verbose = *verbose
+	spec.ShowProgress = *showProgress
+	spec.Subreddit = *subreddit
+	spec.Sorting = *sorting
+	spec.Timeframe = *timeframe
+	spec.Directory = *directory
+	spec.Count = *count
+	spec.MinWidth = *minWidth
+	spec.MinHeight = *minHeight
+}
+
+func GetConfiguration() Configuration {
+	return spec
 }
