@@ -1,7 +1,7 @@
 package main
 
 import (
-	"redditdl/config"
+	"redditdl/pkg/config"
 	"redditdl/pkg/downloader"
 	"redditdl/pkg/logging"
 

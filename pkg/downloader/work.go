@@ -7,7 +7,7 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"redditdl/config"
+	"redditdl/pkg/config"
 	"redditdl/utils"
 	"strings"
 	"sync"

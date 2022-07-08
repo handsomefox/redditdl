@@ -2,7 +2,7 @@ package downloader
 
 import (
 	"fmt"
-	"redditdl/config"
+	"redditdl/pkg/config"
 	"redditdl/pkg/logging"
 	"redditdl/utils"
 
