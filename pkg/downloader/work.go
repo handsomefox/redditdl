@@ -17,18 +17,19 @@ import (
 	"golang.org/x/exp/slices"
 )
 
-// getFilteredImages fetches and then returns a slice of filtered images according to the given configuration.
-func getFilteredImages(c config.Configuration) ([]downloadable, error) {
+// getFilteredMedia fetches and then returns a slice of downloadable posts according to the given configuration.
+func getFilteredMedia(c config.Configuration) ([]downloadable, error) {
 	logger.Debug("Fetching posts")
 	posts, err := getPosts(c)
 	if err != nil {
 		return nil, fmt.Errorf("error gettings posts: %v", err)
 	}
 
-	images := filterImages(posts, c.MinWidth, c.MinHeight)
+	media := postsToMedia(posts, c)
+	filtered := filterByResolution(media, c.MinWidth, c.MinHeight)
 
-	// Continue fetching data until we get the required amount of images
-	if len(images) < c.Count {
+	// Continue fetching data until we get the required amount of media
+	if len(filtered) < c.Count {
 		finished := false
 		c.After = posts.Data.After
 
@@ -49,30 +50,30 @@ func getFilteredImages(c config.Configuration) ([]downloadable, error) {
 				finished = true
 			}
 
-			nextPageImages := filterImages(posts, c.MinWidth, c.MinHeight)
+			nextPageMedia := filterByResolution(postsToMedia(posts, c), c.MinWidth, c.MinHeight)
 
 			// Fill until we get the desired amount
-			for _, image := range nextPageImages {
-				if len(images) >= c.Count {
+			for _, m := range nextPageMedia {
+				if len(filtered) >= c.Count {
 					finished = true
 				}
 				// Ignore duplicates
-				if slices.Contains(images, image) {
+				if slices.Contains(filtered, m) {
 					continue
 				}
-				images = append(images, image)
+				filtered = append(filtered, m)
 			}
 
 			// We will sleep for 5 seconds after each iteration to ensure that we don't hit the rate limiting
 			time.Sleep(5 * time.Second)
 		}
 	}
-	return ensureLength(images, c.Count), nil
+	return ensureLength(filtered, c.Count), nil
 }
 
-// downloadImages takes a slice of FinalImages and a directory string and tries to download every image
+// downloadMedia takes a slice of `downloadable` and a directory string and tries to download every media file
 // to the specified directory, it does not stop if a single download fails.
-func downloadImages(images []downloadable, c config.Configuration) (int, error) {
+func downloadMedia(media []downloadable, c config.Configuration) (int, error) {
 	// Create and move to the specified directory
 	err := navigateToDirectory(c.Directory)
 	if err != nil {
@@ -80,18 +81,18 @@ func downloadImages(images []downloadable, c config.Configuration) (int, error) 
 	}
 
 	var total, finished, failed uint32
-	total = uint32(len(images))
+	total = uint32(len(media))
 
 	if c.ShowProgress {
 		printDownloadStatus(&total, &finished, &failed)
 	}
 
 	wg := new(sync.WaitGroup)
-	// The loop which downloads the images.
-	for i, v := range images {
+	// The loop which does the download.
+	for i, v := range media {
 		wg.Add(1)
-		go func(client *http.Client, index int, imageData downloadable) {
-			if err := downloadImage(index, imageData); err != nil {
+		go func(client *http.Client, index int, data downloadable) {
+			if err := downloadPost(index, data); err != nil {
 				atomic.AddUint32(&failed, 1)
 			} else {
 				atomic.AddUint32(&finished, 1)
@@ -137,9 +138,15 @@ func getPosts(c config.Configuration) (*posts, error) {
 	return posts, nil
 }
 
-// downloadImage downloads the image and stores it in the specified directory.
-func downloadImage(i int, v downloadable) error {
-	response, err := client.Get(v.ImageData.URL)
+// downloadPost downloads a single media file and stores it in the specified directory.
+func downloadPost(i int, v downloadable) error {
+	URL := ""
+	if v.IsVideo {
+		URL = v.VideoData.ScrubberMediaURL
+	} else {
+		URL = v.ImageData.URL
+	}
+	response, err := client.Get(URL)
 	if err != nil {
 		return err
 	}
@@ -150,7 +157,12 @@ func downloadImage(i int, v downloadable) error {
 	}
 
 	filenameAndExtension := strings.Split(response.Request.URL.Path, ".")
-	extension := "jpg"
+	extension := ""
+	if v.IsVideo {
+		extension = "mp4"
+	} else {
+		extension = "jpg"
+	}
 	if len(filenameAndExtension) == 2 {
 		extension = filenameAndExtension[1]
 	}
@@ -176,26 +188,55 @@ func downloadImage(i int, v downloadable) error {
 	return nil
 }
 
-// filterImages converts images inside the posts to FinalImages and filters them by specified resolution.
-func filterImages(posts *posts, minWidth, minHeight int) []downloadable {
-	images := make([]downloadable, 0)
+// Converts posts to media depeding on the configuration, leaving only the required types of media in
+func postsToMedia(posts *posts, c config.Configuration) []downloadable {
+	media := make([]downloadable, 0)
+
 	for _, post := range posts.Data.Children {
-		for _, image := range post.Data.Preview.Images {
-			if image.Source.Width < int64(minWidth) || image.Source.Height < int64(minHeight) {
-				continue
+		if post.Data.IsVideo {
+			// Add the video
+			if c.IncludeVideo {
+				post.Data.Media.RedditVideo.ScrubberMediaURL = strings.ReplaceAll(post.Data.Media.RedditVideo.ScrubberMediaURL, "&amp;s", "&s")
+				media = append(media, downloadable{
+					Name:      post.Data.Title,
+					IsVideo:   true,
+					ImageData: nil,
+					VideoData: &post.Data.Media.RedditVideo,
+				})
 			}
-			image.Source.URL = strings.Replace(image.Source.URL, "&amp;s", "&s", 1)
-			images = append(images, downloadable{
-				Name: post.Data.Title,
-				ImageData: imageData{
-					URL:    image.Source.URL,
-					Width:  image.Source.Width,
-					Height: image.Source.Width,
-				},
-			})
+		} else {
+			// Add the images
+			for _, img := range post.Data.Preview.Images {
+				img.Source.URL = strings.ReplaceAll(img.Source.URL, "&amp;s", "&s")
+				media = append(media, downloadable{
+					Name:      post.Data.Title,
+					IsVideo:   false,
+					ImageData: &img.Source,
+					VideoData: nil,
+				})
+			}
+		}
+
+	}
+
+	return media
+}
+
+// filterByResolution filters posts by specified resolution.
+func filterByResolution(media []downloadable, minWidth, minHeight int) []downloadable {
+	filtered := make([]downloadable, 0)
+	for _, m := range media {
+		if m.IsVideo && m.VideoData != nil {
+			if m.VideoData.Width >= minWidth && m.VideoData.Height >= minHeight {
+				filtered = append(filtered, m)
+			}
+		} else if m.ImageData != nil {
+			if m.ImageData.Width >= int64(minWidth) && m.ImageData.Height >= int64(minHeight) {
+				filtered = append(filtered, m)
+			}
 		}
 	}
-	return images
+	return filtered
 }
 
 // printDownloadStatus is a background thread that prints the download status.
@@ -223,7 +264,7 @@ func ensureLength(posts []downloadable, requiredLength int) []downloadable {
 func navigateToDirectory(directory string) error {
 	if err := os.Mkdir(directory, os.ModePerm); err != nil {
 		if !errors.Is(err, os.ErrExist) {
-			return fmt.Errorf("error creating a directory for images, %v", err)
+			return fmt.Errorf("error creating a directory for media, %v", err)
 		} else {
 			logger.Debug("Directory already exists, but we will still continue")
 		}

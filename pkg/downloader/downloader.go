@@ -14,8 +14,8 @@ import (
 type downloadable struct {
 	Name      string
 	IsVideo   bool
-	ImageData imageData
-	VideoData RedditVideo
+	ImageData *imageData
+	VideoData *RedditVideo
 }
 
 var client = utils.CreateClient()
@@ -25,16 +25,14 @@ var logger *zap.SugaredLogger
 func Download(c config.Configuration) (int, error) {
 	logger = logging.GetLogger(c.Verbose)
 
-	// Get the images
-	images, err := getFilteredImages(c)
+	media, err := getFilteredMedia(c)
 	if err != nil {
-		return 0, fmt.Errorf("error getting images from reddit: %v", err)
+		return 0, fmt.Errorf("error getting media from reddit: %v", err)
 	}
 
-	// Download the filtered images
-	count, err := downloadImages(images, c)
+	count, err := downloadMedia(media, c)
 	if err != nil {
-		return 0, fmt.Errorf("error downloading the images from reddit: %v", err)
+		return 0, fmt.Errorf("error downloading the media from reddit: %v", err)
 	}
 
 	return count, nil
