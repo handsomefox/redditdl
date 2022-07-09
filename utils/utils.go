@@ -29,7 +29,7 @@ func CreateClient() *http.Client {
 	}
 }
 
-// CreateFilename generates a valid filename for the image.
+// CreateFilename generates a valid filename for the media.
 func CreateFilename(name, extension string, idx int) (string, error) {
 	formatted, err := formatFilename(name, extension)
 	if err != nil {
