@@ -1,5 +1,18 @@
 package downloader
 
+// downloadable contains information which is required to filter by resolution,
+// download and store a video or an image.
+type downloadable struct {
+	Name    string
+	Data    data
+	IsVideo bool
+}
+
+type data struct {
+	URL           string
+	Width, Height int
+}
+
 type posts struct {
 	Kind string    `json:"kind"`
 	Data postsData `json:"data"`
@@ -40,8 +53,8 @@ type RedditVideo struct {
 
 type imageData struct {
 	URL    string `json:"url"`
-	Width  int64  `json:"width"`
-	Height int64  `json:"height"`
+	Width  int    `json:"width"`
+	Height int    `json:"height"`
 }
 
 type preview struct {

@@ -30,7 +30,7 @@ func CreateClient() *http.Client {
 }
 
 // CreateFilename generates a valid filename for the media.
-func CreateFilename(name, extension string, idx int) (string, error) {
+func CreateFilename(name, extension string) (string, error) {
 	formatted, err := formatFilename(name, extension)
 	if err != nil {
 		return "", fmt.Errorf("error creating filename (%v): %v", name, err)
@@ -38,7 +38,7 @@ func CreateFilename(name, extension string, idx int) (string, error) {
 
 	// Resolve duplicates
 	for i := 0; FileExists(formatted); i++ {
-		formatted, err = formatFilename("("+strconv.Itoa(idx)+") "+name, extension)
+		formatted, err = formatFilename("("+strconv.Itoa(i)+") "+name, extension)
 		if err != nil {
 			return "", fmt.Errorf("error creating filename (%v): %v", name, err)
 		}
@@ -85,7 +85,8 @@ func removeForbiddenChars(name string) string {
 	return result
 }
 
-func IsUrl(str string) bool {
+// IsURL checks if the URL is valid
+func IsURL(str string) bool {
 	u, err := url.Parse(str)
 	return err == nil && u.Scheme != "" && u.Host != ""
 }
