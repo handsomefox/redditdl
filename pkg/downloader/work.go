@@ -158,8 +158,6 @@ func downloadPost(v downloadable) error {
 		return fmt.Errorf("error when downloading to disk: %v", err)
 	}
 
-	fmt.Println(filename)
-
 	file, err := os.Create(filename)
 	if err != nil {
 		return fmt.Errorf("error when creating a file: %v", err)
