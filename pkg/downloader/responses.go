@@ -16,11 +16,24 @@ type child struct {
 }
 
 type childData struct {
-	Title     string      `json:"title"`
-	Thumbnail string      `json:"thumbnail"`
-	Preview   preview     `json:"preview"`
-	Media     interface{} `json:"media"`
-	IsVideo   bool        `json:"is_video"`
+	Title     string  `json:"title"`
+	Thumbnail string  `json:"thumbnail"`
+	Preview   preview `json:"preview"`
+	Media     struct {
+		RedditVideo struct {
+			BitrateKbps       int    `json:"bitrate_kbps"`
+			FallbackURL       string `json:"fallback_url"`
+			Height            int    `json:"height"`
+			Width             int    `json:"width"`
+			ScrubberMediaURL  string `json:"scrubber_media_url"`
+			DashURL           string `json:"dash_url"`
+			Duration          int    `json:"duration"`
+			HlsURL            string `json:"hls_url"`
+			IsGif             bool   `json:"is_gif"`
+			TranscodingStatus string `json:"transcoding_status"`
+		} `json:"reddit_video"`
+	} `json:"media"`
+	IsVideo bool `json:"is_video"`
 }
 
 type imageData struct {
