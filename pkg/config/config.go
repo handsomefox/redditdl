@@ -10,6 +10,8 @@ type Configuration struct {
 	Verbose bool
 	// ShowProgress indicates whether the application will show the download progress
 	ShowProgress bool
+	// IncludeVideo indicates wheter the application should download videos as well
+	IncludeVideo bool
 	// Subreddit name
 	Subreddit string
 	// Sorting How to sort the subreddit
@@ -33,6 +35,7 @@ var spec Configuration
 func init() {
 	verbose := flag.Bool("verbose", false, "Turns the logging on or off")
 	showProgress := flag.Bool("progress", false, "Indicates whether the application will show the download progress")
+	includeVideo := flag.Bool("video", false, "Indicates wheter the application should download videos as well")
 	subreddit := flag.String("sub", "wallpaper", "Subreddit name")
 	sorting := flag.String("sort", "top", "How to sort (controversial, best, hot, new, random, rising, top)")
 	timeframe := flag.String("tf", "all", "Timeframe from which to get the posts (hour, day, week, month, year, all)")
@@ -45,6 +48,7 @@ func init() {
 
 	spec.Verbose = *verbose
 	spec.ShowProgress = *showProgress
+	spec.IncludeVideo = *includeVideo
 	spec.Subreddit = *subreddit
 	spec.Sorting = *sorting
 	spec.Timeframe = *timeframe
