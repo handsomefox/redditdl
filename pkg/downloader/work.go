@@ -18,7 +18,7 @@ import (
 )
 
 // getFilteredImages fetches and then returns a slice of filtered images according to the given configuration.
-func getFilteredImages(c config.Configuration) ([]finalImage, error) {
+func getFilteredImages(c config.Configuration) ([]downloadable, error) {
 	logger.Debug("Fetching posts")
 	posts, err := getPosts(c)
 	if err != nil {
@@ -72,7 +72,7 @@ func getFilteredImages(c config.Configuration) ([]finalImage, error) {
 
 // downloadImages takes a slice of FinalImages and a directory string and tries to download every image
 // to the specified directory, it does not stop if a single download fails.
-func downloadImages(images []finalImage, c config.Configuration) (int, error) {
+func downloadImages(images []downloadable, c config.Configuration) (int, error) {
 	// Create and move to the specified directory
 	err := navigateToDirectory(c.Directory)
 	if err != nil {
@@ -90,7 +90,7 @@ func downloadImages(images []finalImage, c config.Configuration) (int, error) {
 	// The loop which downloads the images.
 	for i, v := range images {
 		wg.Add(1)
-		go func(client *http.Client, index int, imageData finalImage) {
+		go func(client *http.Client, index int, imageData downloadable) {
 			if err := downloadImage(index, imageData); err != nil {
 				atomic.AddUint32(&failed, 1)
 			} else {
@@ -138,8 +138,8 @@ func getPosts(c config.Configuration) (*posts, error) {
 }
 
 // downloadImage downloads the image and stores it in the specified directory.
-func downloadImage(i int, v finalImage) error {
-	response, err := client.Get(v.Data.URL)
+func downloadImage(i int, v downloadable) error {
+	response, err := client.Get(v.ImageData.URL)
 	if err != nil {
 		return err
 	}
@@ -177,17 +177,17 @@ func downloadImage(i int, v finalImage) error {
 }
 
 // filterImages converts images inside the posts to FinalImages and filters them by specified resolution.
-func filterImages(posts *posts, minWidth, minHeight int) []finalImage {
-	images := make([]finalImage, 0)
+func filterImages(posts *posts, minWidth, minHeight int) []downloadable {
+	images := make([]downloadable, 0)
 	for _, post := range posts.Data.Children {
 		for _, image := range post.Data.Preview.Images {
 			if image.Source.Width < int64(minWidth) || image.Source.Height < int64(minHeight) {
 				continue
 			}
 			image.Source.URL = strings.Replace(image.Source.URL, "&amp;s", "&s", 1)
-			images = append(images, finalImage{
+			images = append(images, downloadable{
 				Name: post.Data.Title,
-				Data: imageData{
+				ImageData: imageData{
 					URL:    image.Source.URL,
 					Width:  image.Source.Width,
 					Height: image.Source.Width,
@@ -212,7 +212,7 @@ func printDownloadStatus(total *uint32, finished *uint32, failed *uint32) {
 }
 
 // ensureLength ensures that the total amount of posts is the same as the one specified in the configuration.
-func ensureLength(posts []finalImage, requiredLength int) []finalImage {
+func ensureLength(posts []downloadable, requiredLength int) []downloadable {
 	if len(posts) > requiredLength {
 		return posts[:requiredLength]
 	}
