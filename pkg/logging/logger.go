@@ -10,6 +10,7 @@ func GetLogger(dev bool) *zap.SugaredLogger {
 	var log *zap.Logger
 	if dev {
 		cfg := zap.NewDevelopmentEncoderConfig()
+		cfg.EncodeTime = zapcore.RFC3339TimeEncoder
 		cfg.EncodeLevel = zapcore.CapitalColorLevelEncoder
 		log = zap.New(zapcore.NewCore(
 			zapcore.NewConsoleEncoder(cfg),
@@ -19,6 +20,7 @@ func GetLogger(dev bool) *zap.SugaredLogger {
 
 	} else {
 		cfg := zap.NewProductionEncoderConfig()
+		cfg.EncodeTime = zapcore.RFC3339TimeEncoder
 		cfg.EncodeLevel = zapcore.CapitalColorLevelEncoder
 		log = zap.New(zapcore.NewCore(
 			zapcore.NewConsoleEncoder(cfg),
