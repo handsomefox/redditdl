@@ -248,11 +248,11 @@ func filterInvalidURLs(media []downloadable) []downloadable {
 	filtered := make([]downloadable, 0)
 	for _, m := range media {
 		if m.IsVideo && m.VideoData != nil {
-			if len(m.VideoData.ScrubberMediaURL) > 0 {
+			if len(m.VideoData.ScrubberMediaURL) > 0 && utils.IsUrl(m.VideoData.ScrubberMediaURL) {
 				filtered = append(filtered, m)
 			}
 		} else if m.ImageData != nil {
-			if len(m.ImageData.URL) > 0 {
+			if len(m.ImageData.URL) > 0 && utils.IsUrl(m.ImageData.URL) {
 				filtered = append(filtered, m)
 			}
 		}
