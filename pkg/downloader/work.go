@@ -188,7 +188,7 @@ func downloadPost(i int, v downloadable) error {
 	return nil
 }
 
-// Converts posts to media depeding on the configuration, leaving only the required types of media in
+// Converts posts to media depending on the configuration, leaving only the required types of media in
 func postsToMedia(posts *posts, c config.Configuration) []downloadable {
 	media := make([]downloadable, 0)
 

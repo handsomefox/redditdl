@@ -12,9 +12,8 @@ import (
 )
 
 var (
-	ErrInvalidFilenameSyntax = errors.New("invalid filename syntax")
-	ErrEmptyFilename         = errors.New("empty filename")
-	ErrEmptyExtension        = errors.New("empty extension")
+	ErrEmptyFilename  = errors.New("empty filename")
+	ErrEmptyExtension = errors.New("empty extension")
 )
 
 const NtfsMaxFilenameLength = 256

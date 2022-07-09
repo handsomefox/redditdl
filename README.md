@@ -30,7 +30,7 @@ Usage of redditdl:
   -verbose
         Turns the logging on or off (default false)
   -video
-        Indicates wheter the application should download videos as well (default false)
+        Indicates whether the application should download videos as well (default false)
   -width int
         minimal width of the media to download
 ```
