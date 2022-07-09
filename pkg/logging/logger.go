@@ -1,13 +1,30 @@
 package logging
 
-import "go.uber.org/zap"
+import (
+	"github.com/mattn/go-colorable"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+)
 
 func GetLogger(dev bool) *zap.SugaredLogger {
 	var log *zap.Logger
 	if dev {
-		log, _ = zap.NewDevelopment()
+		cfg := zap.NewDevelopmentEncoderConfig()
+		cfg.EncodeLevel = zapcore.CapitalColorLevelEncoder
+		log = zap.New(zapcore.NewCore(
+			zapcore.NewConsoleEncoder(cfg),
+			zapcore.AddSync(colorable.NewColorableStdout()),
+			zapcore.DebugLevel,
+		))
+
 	} else {
-		log, _ = zap.NewProduction()
+		cfg := zap.NewProductionEncoderConfig()
+		cfg.EncodeLevel = zapcore.CapitalColorLevelEncoder
+		log = zap.New(zapcore.NewCore(
+			zapcore.NewConsoleEncoder(cfg),
+			zapcore.AddSync(colorable.NewColorableStdout()),
+			zapcore.InfoLevel,
+		))
 	}
 	defer log.Sync()
 	return log.Sugar()
