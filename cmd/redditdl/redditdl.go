@@ -19,12 +19,12 @@ func main() {
 	// Print the configuration
 	logger.Debugf("Using parameters: %#v", c)
 
-	// Download the images
-	logger.Info("Started downloading images")
+	// Download the media
+	logger.Info("Started downloading media")
 
 	count, err := downloader.Download(c)
 	if err != nil {
-		logger.Fatal("error downloading images", zap.Error(err))
+		logger.Fatal("error downloading media", zap.Error(err))
 	}
-	logger.Infof("Finished downloading %d image(s)", count)
+	logger.Infof("Finished downloading %d image(s)/video(s)", count)
 }
