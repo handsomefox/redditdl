@@ -14,6 +14,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"go.uber.org/zap"
 	"golang.org/x/exp/slices"
 )
 
@@ -26,8 +27,7 @@ func getFilteredMedia(c config.Configuration) ([]downloadable, error) {
 	}
 
 	media := postsToMedia(posts, c)
-	filtered := filterByResolution(media, c.MinWidth, c.MinHeight)
-
+	filtered := filterByResolution(filterInvalidURLs(media), c.MinWidth, c.MinHeight)
 	// Continue fetching data until we get the required amount of media
 	if len(filtered) < c.Count {
 		finished := false
@@ -50,7 +50,8 @@ func getFilteredMedia(c config.Configuration) ([]downloadable, error) {
 				finished = true
 			}
 
-			nextPageMedia := filterByResolution(postsToMedia(posts, c), c.MinWidth, c.MinHeight)
+			nextPageMedia := filterByResolution(filterInvalidURLs(postsToMedia(posts, c)),
+				c.MinWidth, c.MinHeight)
 
 			// Fill until we get the desired amount
 			for _, m := range nextPageMedia {
@@ -63,7 +64,7 @@ func getFilteredMedia(c config.Configuration) ([]downloadable, error) {
 				}
 				filtered = append(filtered, m)
 			}
-
+			logger.Debug("Current post count", zap.Int("count", len(filtered)))
 			// We will sleep for 5 seconds after each iteration to ensure that we don't hit the rate limiting
 			time.Sleep(5 * time.Second)
 		}
@@ -190,6 +191,7 @@ func downloadPost(i int, v downloadable) error {
 
 // Converts posts to media depending on the configuration, leaving only the required types of media in
 func postsToMedia(posts *posts, c config.Configuration) []downloadable {
+	logger.Debug("Converting posts to media...")
 	media := make([]downloadable, 0)
 
 	for _, post := range posts.Data.Children {
@@ -224,6 +226,7 @@ func postsToMedia(posts *posts, c config.Configuration) []downloadable {
 
 // filterByResolution filters posts by specified resolution.
 func filterByResolution(media []downloadable, minWidth, minHeight int) []downloadable {
+	logger.Debug("Filtering posts...")
 	filtered := make([]downloadable, 0)
 	for _, m := range media {
 		if m.IsVideo && m.VideoData != nil {
@@ -232,6 +235,24 @@ func filterByResolution(media []downloadable, minWidth, minHeight int) []downloa
 			}
 		} else if m.ImageData != nil {
 			if m.ImageData.Width >= int64(minWidth) && m.ImageData.Height >= int64(minHeight) {
+				filtered = append(filtered, m)
+			}
+		}
+	}
+	return filtered
+}
+
+// filterInvalidURLs filters out posts with invalid (or empty) URL(s)
+func filterInvalidURLs(media []downloadable) []downloadable {
+	logger.Debug("Filtering URLs...")
+	filtered := make([]downloadable, 0)
+	for _, m := range media {
+		if m.IsVideo && m.VideoData != nil {
+			if len(m.VideoData.ScrubberMediaURL) > 0 {
+				filtered = append(filtered, m)
+			}
+		} else if m.ImageData != nil {
+			if len(m.ImageData.URL) > 0 {
 				filtered = append(filtered, m)
 			}
 		}
