@@ -22,3 +22,5 @@ go.work
 
 # Idea folder
 .idea/
+
+dist/
