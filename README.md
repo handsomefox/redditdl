@@ -12,27 +12,27 @@ go build --ldflags "-s -w" -o redditdl
 
 ```text
 Usage of redditdl:
-
-  -count int
-        Amount of images (and videos if specified) to download (default 1)
-  -dir string
-        Specifies the directory where to download the media (default "media")
-  -height int
-        minimal height of the media to download
-  -progress
-        Indicates whether the application will show the download progress (default false)
-  -sort string
-        How to sort (controversial, best, hot, new, random, rising, top) (default "top")
-  -sub string
-        Subreddit name (default "wallpaper")
-  -tf string
-        Timeframe from which to get the posts (hour, day, week, month, year, all) (default "all")
-  -verbose
-        Turns the logging on or off (default false)
+  -cnt
+      Amount of media to download (default 1)
+  -dir
+      Specifies the directory where to download the media (default "media")
+  -h
+      minimal height of the media to download
+  -w
+      minimal width of the media to download
+  -p
+      Indicates whether the application will show the download progress
+  -sort
+      How to sort (controversial, best, hot, new, random, rising, top) (default "top")
+  -sub
+      Subreddit name (default "wallpaper")
+  -tf
+      Timeframe from which to get the posts (hour, day, week, month, year, all) (default "all")
+  -v
+      Turns the logging on or off
   -video
-        Indicates whether the application should download videos as well (default false)
-  -width int
-        minimal width of the media to download
+      Indicates whether the application should download videos as well
+
 ```
 
 ## Example

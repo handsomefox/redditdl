@@ -64,6 +64,7 @@ func formatFilename(filename, extension string) (string, error) {
 	}
 
 	filename = removeForbiddenChars(filename)
+	extension = removeForbiddenChars(extension)
 
 	totalLength := len(filename) + len(extension) + 1
 	if totalLength > NtfsMaxFilenameLength {
@@ -80,13 +81,29 @@ var forbiddenChars = []string{"/", "<", ">", ":", "\"", "\\", "|", "?", "*"}
 func removeForbiddenChars(name string) string {
 	result := name
 	for _, c := range forbiddenChars {
-		result = strings.ReplaceAll(result, c, " ")
+		result = strings.ReplaceAll(result, c, "")
 	}
 	return result
 }
 
 // IsURL checks if the URL is valid
 func IsURL(str string) bool {
-	u, err := url.Parse(str)
-	return err == nil && u.Scheme != "" && u.Host != ""
+	u, err := url.ParseRequestURI(str)
+	return err == nil && u.Host != "" && u.Scheme != ""
+}
+
+// NavigateToDirectory moves to the provided directory and creates it if necessary.
+func NavigateToDirectory(dir string, createDir bool) error {
+	if createDir {
+		if err := os.Mkdir(dir, os.ModePerm); err != nil {
+			if !errors.Is(err, os.ErrExist) {
+				return fmt.Errorf("error creating a directory, %v", err)
+			}
+		}
+	}
+
+	if err := os.Chdir(dir); err != nil {
+		return fmt.Errorf("error navigating to directory, %v", err)
+	}
+	return nil
 }

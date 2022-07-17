@@ -1,14 +1,14 @@
 package downloader
 
-// downloadable contains information which is required to filter by resolution,
+// toDownload contains information which is required to filter by resolution,
 // download and store a video or an image.
-type downloadable struct {
+type toDownload struct {
 	Name    string
-	Data    data
+	Data    imgData
 	IsVideo bool
 }
 
-type data struct {
+type imgData struct {
 	URL           string
 	Width, Height int
 }
