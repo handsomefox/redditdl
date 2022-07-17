@@ -17,7 +17,6 @@ func TestDownload(t *testing.T) {
 		Count:        5,
 		MinWidth:     0,
 		MinHeight:    0,
-		After:        "",
 	}
 
 	dl := New(cfg, Filters)

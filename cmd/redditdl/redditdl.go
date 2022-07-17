@@ -4,8 +4,6 @@ import (
 	"flag"
 	"redditdl/pkg/downloader"
 	"redditdl/pkg/logging"
-
-	"go.uber.org/zap"
 )
 
 func main() {
@@ -46,7 +44,7 @@ func main() {
 	dl := downloader.New(c, downloader.Filters)
 	count, err := dl.Download()
 	if err != nil {
-		log.Fatal("error downloading media", zap.Error(err))
+		log.Fatal("error downloading media", err)
 	}
 	log.Infof("Finished downloading %d image(s)/video(s)", count)
 }

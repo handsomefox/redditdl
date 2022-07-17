@@ -12,13 +12,6 @@ import (
 	"time"
 )
 
-var (
-	ErrEmptyFilename  = errors.New("empty filename")
-	ErrEmptyExtension = errors.New("empty extension")
-)
-
-const NtfsMaxFilenameLength = 256
-
 // CreateClient returns a pointer to http.Client configured to work with reddit.
 func CreateClient() *http.Client {
 	return &http.Client{
@@ -53,16 +46,16 @@ func FileExists(filename string) bool {
 	return os.IsExist(err)
 }
 
+const NtfsMaxFilenameLength = 256
+
 // formatFilename ensures that the filename is valid for NTFS and has the right extension
 func formatFilename(filename, extension string) (string, error) {
 	if len(filename) == 0 {
-		return "", ErrEmptyFilename
+		return "", fmt.Errorf("empty filename")
 	}
-
 	if len(extension) == 0 {
-		return "", ErrEmptyExtension
+		return "", fmt.Errorf("file should have an extension")
 	}
-
 	filename = removeForbiddenChars(filename)
 	extension = removeForbiddenChars(extension)
 

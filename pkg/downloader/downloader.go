@@ -18,126 +18,114 @@ import (
 )
 
 type DownloaderSettings struct {
-	// Verbose turns the logging on or off
-	Verbose bool
-	// ShowProgress indicates whether the application will show the download progress
-	ShowProgress bool
-	// IncludeVideo indicates whether the application should download videos as well
-	IncludeVideo bool
-	// Subreddit name
-	Subreddit string
-	// Sorting How to sort the subreddit
-	Sorting string
-	// Timeframe of the posts
-	Timeframe string
-	// Directory to download media to
-	Directory string
-	// Count Amount of media to download
-	Count int
-	// MinWidth Minimal width of the media
-	MinWidth int
-	// MinHeight Minimal height of the media
-	MinHeight int
-	// After is a post ID, which is used to fetch posts after that ID
-	After string
+	Verbose      bool   // Verbose turns the logging on or off
+	ShowProgress bool   // ShowProgress indicates whether the application will show the download progress
+	IncludeVideo bool   // IncludeVideo indicates whether the application should download videos as well
+	Subreddit    string // Subreddit name
+	Sorting      string // Sorting How to sort the subreddit
+	Timeframe    string // Timeframe of the posts
+	Directory    string // Directory to download media to
+	Count        int    // Count Amount of media to download
+	MinWidth     int    // MinWidth Minimal width of the media
+	MinHeight    int    // MinHeight Minimal height of the media
 }
 
 // Use New() to create a Downloader
 type Downloader struct {
-	fs  []Filter
-	s   DownloaderSettings
+	fs []Filter
+	s  *DownloaderSettings
+
 	cl  *http.Client
 	log *zap.SugaredLogger
+
+	after string // After is a post ID, which is used to fetch posts after that ID
 }
 
 // New gives a new instance of Downloader
 func New(cfg DownloaderSettings, filters []Filter) *Downloader {
 	return &Downloader{
-		fs:  filters,
-		s:   cfg,
-		cl:  utils.CreateClient(),
-		log: logging.GetLogger(cfg.Verbose),
+		fs:    filters,
+		s:     &cfg,
+		cl:    utils.CreateClient(),
+		log:   logging.GetLogger(cfg.Verbose),
+		after: "",
 	}
 }
 
 // Download downloads the images according to the given configuration
-func (d *Downloader) Download() (uint32, error) {
-	media, err := d.getFilteredMedia()
+func (dler *Downloader) Download() (uint32, error) {
+	media, err := dler.runDownloadLoop()
 	if err != nil {
 		return 0, fmt.Errorf("error getting media from reddit: %v", err)
 	}
 
-	count, err := d.downloadMedia(media)
-	if err != nil {
-		return 0, fmt.Errorf("error downloading the media from reddit: %v", err)
-	}
-
-	return count, nil
+	return dler.runSaveLoop(media)
 }
 
-// getFilteredMedia fetches and then returns a slice of downloadable posts according to the given configuration.
-func (d *Downloader) getFilteredMedia() ([]toDownload, error) {
-	media := make([]toDownload, 0, d.s.Count)
-	for len(media) < d.s.Count {
-		d.log.Debug("Fetching posts")
-		posts, err := d.getPosts()
+// this is the main download loop.
+func (dler *Downloader) runDownloadLoop() ([]toDownload, error) {
+	media := make([]toDownload, 0, dler.s.Count)
+
+	for len(media) < dler.s.Count {
+		dler.log.Debug("Fetching posts")
+
+		posts, err := dler.getPosts()
 		if err != nil {
 			return nil, fmt.Errorf("error gettings posts: %v", err)
 		}
-		converted := d.postsToMedia(posts)
-		converted = d.applyFilters(converted, d.fs)
+
+		values := dler.postsToMedia(posts)
+		values = dler.applyFilters(values, dler.fs)
 
 		// Fill until we get the desired amount
-		for _, m := range converted {
-			if len(media) >= d.s.Count {
+		for _, v := range values {
+			if len(media) >= dler.s.Count {
 				break
 			}
-			if slices.Contains(media, m) {
+			if slices.Contains(media, v) {
 				continue
 			}
-			media = append(media, m)
+			media = append(media, v)
 		}
 
-		if len(posts.Data.Children) == 0 || posts.Data.After == d.s.After {
-			d.log.Debug("There's no more posts to load")
+		if len(posts.Data.Children) == 0 || posts.Data.After == dler.after || len(posts.Data.After) == 0 {
+			dler.log.Info("There's no more posts to load (or we got rate limited)")
 			break
 		}
-		d.s.After = posts.Data.After
-		if len(d.s.After) == 0 {
-			d.log.Debug("We might have got rate limited")
-		}
-		d.log.Debug("Current post count", zap.Int("count", len(media)))
+		dler.after = posts.Data.After
+
+		dler.log.Debug("Current post count: ", len(media))
 		// We will sleep for 5 seconds after each iteration to ensure that we don't hit the rate limiting
 		time.Sleep(5 * time.Second)
 	}
+
 	return media, nil
 }
 
-func (d *Downloader) applyFilters(dl []toDownload, fs []Filter) []toDownload {
-	d.log.Debug("Filtering posts...")
-	if len(fs) == 0 {
+func (dler *Downloader) applyFilters(dl []toDownload, fs []Filter) []toDownload {
+	if len(fs) == 0 { // return the original posts if there are no filters
 		return dl
 	}
+	dler.log.Debug("Filtering posts...")
 
-	f := make([]toDownload, 0)
+	f := make([]toDownload, 0, dler.s.Count)
 	for _, ff := range fs {
-		f = append(f, ff.Filter(dl, &d.s)...)
+		f = append(f, ff.Filter(dl, dler.s)...)
 	}
 	return f
 }
 
-// downloadMedia takes a slice of `downloadable` and a directory string and tries to download every media file
-// to the specified directory, it does not stop if a single download fails.
-func (d *Downloader) downloadMedia(media []toDownload) (uint32, error) {
-	err := utils.NavigateToDirectory(d.s.Directory, true)
-	if err != nil {
-		return 0, fmt.Errorf("failed to navigate to directory, error: %v, directory: %v", err, d.s.Directory)
+// runSaveLoop is the loop for saving files to disk. It takes a slice of `downloadable` and a directory string and tries
+//  to download every media file to the specified directory.
+func (dler *Downloader) runSaveLoop(media []toDownload) (uint32, error) {
+	if err := utils.NavigateToDirectory(dler.s.Directory, true); err != nil {
+		return 0, fmt.Errorf("failed to navigate to directory, error: %v, directory: %v", err, dler.s.Directory)
 	}
 
 	var total, finished, failed uint32
 	total = uint32(len(media))
 
-	if d.s.ShowProgress {
+	if dler.s.ShowProgress {
 		printDownloadStatus(&total, &finished, &failed)
 	}
 
@@ -145,25 +133,25 @@ func (d *Downloader) downloadMedia(media []toDownload) (uint32, error) {
 	for _, v := range media {
 		wg.Add(1)
 		go func(client *http.Client, data toDownload) {
-			if err := d.downloadPost(data); err != nil {
+			if err := dler.downloadMedia(&data); err != nil {
 				atomic.AddUint32(&failed, 1)
 			} else {
 				atomic.AddUint32(&finished, 1)
 			}
 			wg.Done()
-		}(d.cl, v)
+		}(dler.cl, v)
 	}
 	wg.Wait()
 	return finished, nil
 }
 
 // getPosts fetches a json file from reddit containing information about the posts using the given configuration.
-func (d *Downloader) getPosts() (*posts, error) {
+func (dler *Downloader) getPosts() (*posts, error) {
 	URL := fmt.Sprintf("https://www.reddit.com/r/%s/%s.json?limit=%d&t=%s",
-		d.s.Subreddit, d.s.Sorting, d.s.Count, d.s.Timeframe)
+		dler.s.Subreddit, dler.s.Sorting, dler.s.Count, dler.s.Timeframe)
 
-	if len(d.s.After) > 0 {
-		URL = fmt.Sprintf("%s&after=%s&count=%d", URL, d.s.After, d.s.Count)
+	if len(dler.after) > 0 {
+		URL = fmt.Sprintf("%s&after=%s&count=%d", URL, dler.after, dler.s.Count)
 	}
 
 	request, err := http.NewRequest("GET", URL, nil)
@@ -172,14 +160,14 @@ func (d *Downloader) getPosts() (*posts, error) {
 	}
 	request.Header.Add("User-Agent", "go:getter")
 
-	response, err := d.cl.Do(request)
+	response, err := dler.cl.Do(request)
 	if err != nil {
 		return nil, fmt.Errorf("fetching from reddit failed, error: %v, URL: %v", err, URL)
 	}
 	defer func(Body io.ReadCloser) {
 		err := Body.Close()
 		if err != nil {
-			d.log.Error(err)
+			dler.log.Error(err)
 		}
 	}(response.Body)
 
@@ -191,20 +179,19 @@ func (d *Downloader) getPosts() (*posts, error) {
 	if err := json.NewDecoder(response.Body).Decode(posts); err != nil {
 		return nil, fmt.Errorf("error decoding posts: %v", err)
 	}
-
 	return posts, nil
 }
 
-// downloadPost downloads a single media file and stores it in the specified directory.
-func (d *Downloader) downloadPost(v toDownload) error {
-	response, err := d.cl.Get(v.Data.URL)
+// downloadMedia downloads a single media file and stores it in the specified directory.
+func (dler *Downloader) downloadMedia(v *toDownload) error {
+	response, err := dler.cl.Get(v.Data.URL)
 	if err != nil {
 		return err
 	}
 	defer func(Body io.ReadCloser) {
 		err := Body.Close()
 		if err != nil {
-			d.log.Error(err)
+			dler.log.Error(err)
 		}
 	}(response.Body)
 
@@ -235,7 +222,7 @@ func (d *Downloader) downloadPost(v toDownload) error {
 	defer func(file *os.File) {
 		err := file.Close()
 		if err != nil {
-			d.log.Error(err)
+			dler.log.Error(err)
 		}
 	}(file)
 
@@ -250,11 +237,11 @@ func (d *Downloader) downloadPost(v toDownload) error {
 }
 
 // Converts posts to media depending on the configuration, leaving only the required types of media in
-func (d *Downloader) postsToMedia(posts *posts) []toDownload {
-	d.log.Debug("Converting posts to media...")
+func (dler *Downloader) postsToMedia(posts *posts) []toDownload {
+	dler.log.Debug("Converting posts to media...")
 	media := make([]toDownload, 0)
 	for _, post := range posts.Data.Children {
-		if post.Data.IsVideo && d.s.IncludeVideo {
+		if post.Data.IsVideo && dler.s.IncludeVideo {
 			media = append(media, toDownload{
 				Name:    post.Data.Title,
 				Data:    createVideo(&post.Data.Media.RedditVideo),

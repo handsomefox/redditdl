@@ -6,28 +6,36 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-func GetLogger(dev bool) *zap.SugaredLogger {
-	var log *zap.Logger
-	if dev {
-		cfg := zap.NewDevelopmentEncoderConfig()
-		cfg.EncodeTime = zapcore.RFC3339TimeEncoder
-		cfg.EncodeLevel = zapcore.CapitalColorLevelEncoder
-		log = zap.New(zapcore.NewCore(
-			zapcore.NewConsoleEncoder(cfg),
-			zapcore.AddSync(colorable.NewColorableStdout()),
-			zapcore.DebugLevel,
-		))
+var (
+	log         *zap.Logger
+	cfg         zapcore.EncoderConfig
+	level       zapcore.Level
+	encodeTime  = zapcore.RFC3339TimeEncoder
+	encodeLevel = zapcore.CapitalColorLevelEncoder
+)
 
-	} else {
-		cfg := zap.NewProductionEncoderConfig()
-		cfg.EncodeTime = zapcore.RFC3339TimeEncoder
-		cfg.EncodeLevel = zapcore.CapitalColorLevelEncoder
-		log = zap.New(zapcore.NewCore(
-			zapcore.NewConsoleEncoder(cfg),
-			zapcore.AddSync(colorable.NewColorableStdout()),
-			zapcore.InfoLevel,
-		))
+func GetLogger(dev bool) *zap.SugaredLogger {
+	if log != nil {
+		return log.Sugar()
 	}
+
+	if dev {
+		cfg = zap.NewDevelopmentEncoderConfig()
+		level = zapcore.DebugLevel
+	} else {
+		cfg = zap.NewProductionEncoderConfig()
+		level = zapcore.InfoLevel
+	}
+
+	cfg.EncodeLevel = encodeLevel
+	cfg.EncodeTime = encodeTime
+
+	log = zap.New(zapcore.NewCore(
+		zapcore.NewConsoleEncoder(cfg),
+		zapcore.AddSync(colorable.NewColorableStdout()),
+		level,
+	))
+
 	defer log.Sync()
 	return log.Sugar()
 }
