@@ -129,7 +129,7 @@ func (d *Downloader) applyFilters(dl []toDownload, fs []Filter) []toDownload {
 // downloadMedia takes a slice of `downloadable` and a directory string and tries to download every media file
 // to the specified directory, it does not stop if a single download fails.
 func (d *Downloader) downloadMedia(media []toDownload) (uint32, error) {
-	err := utils.NavigateToDirectory(d.s.Directory)
+	err := utils.NavigateToDirectory(d.s.Directory, true)
 	if err != nil {
 		return 0, fmt.Errorf("failed to navigate to directory, error: %v, directory: %v", err, d.s.Directory)
 	}

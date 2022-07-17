@@ -38,5 +38,5 @@ Usage of redditdl:
 ## Example
 
 ```bash
-redditdl -count 5 -dir example
+redditdl -cnt 5 -dir example
 ```
