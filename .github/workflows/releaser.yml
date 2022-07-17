@@ -29,7 +29,6 @@ jobs:
         uses: goreleaser/goreleaser-action@v2
         with:
           # either 'goreleaser' (default) or 'goreleaser-pro'
-          workdir: cmd/redditdl
           distribution: goreleaser
           version: latest
           args: release --rm-dist
