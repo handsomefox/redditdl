@@ -17,6 +17,7 @@ import (
 	"golang.org/x/exp/slices"
 )
 
+// DownloaderSettings is the configuration for the Downloader
 type DownloaderSettings struct {
 	Verbose      bool   // Verbose turns the logging on or off
 	ShowProgress bool   // ShowProgress indicates whether the application will show the download progress
@@ -33,10 +34,10 @@ type DownloaderSettings struct {
 // Use New() to create a Downloader
 type Downloader struct {
 	fs []Filter
-	s  *DownloaderSettings
+	ds *DownloaderSettings
 
-	cl  *http.Client
-	log *zap.SugaredLogger
+	client *http.Client
+	log    *zap.SugaredLogger
 
 	after string // After is a post ID, which is used to fetch posts after that ID
 }
@@ -44,29 +45,29 @@ type Downloader struct {
 // New gives a new instance of Downloader
 func New(cfg DownloaderSettings, filters []Filter) *Downloader {
 	return &Downloader{
-		fs:    filters,
-		s:     &cfg,
-		cl:    utils.CreateClient(),
-		log:   logging.GetLogger(cfg.Verbose),
-		after: "",
+		fs:     filters,
+		ds:     &cfg,
+		client: utils.CreateClient(),
+		log:    logging.GetLogger(cfg.Verbose),
+		after:  "",
 	}
 }
 
 // Download downloads the images according to the given configuration
 func (dler *Downloader) Download() (uint32, error) {
-	media, err := dler.runDownloadLoop()
+	media, err := dler.fetchLoop()
 	if err != nil {
 		return 0, fmt.Errorf("error getting media from reddit: %v", err)
 	}
 
-	return dler.runSaveLoop(media)
+	return dler.saveLoop(media)
 }
 
-// this is the main download loop.
-func (dler *Downloader) runDownloadLoop() ([]toDownload, error) {
-	media := make([]toDownload, 0, dler.s.Count)
+// this is the fetch loop, where we get needed amount of filtered posts.
+func (dler *Downloader) fetchLoop() ([]toDownload, error) {
+	media := make([]toDownload, 0, dler.ds.Count)
 
-	for len(media) < dler.s.Count {
+	for len(media) < dler.ds.Count {
 		dler.log.Debug("Fetching posts")
 
 		posts, err := dler.getPosts()
@@ -79,7 +80,7 @@ func (dler *Downloader) runDownloadLoop() ([]toDownload, error) {
 
 		// Fill until we get the desired amount
 		for _, v := range values {
-			if len(media) >= dler.s.Count {
+			if len(media) >= dler.ds.Count {
 				break
 			}
 			if slices.Contains(media, v) {
@@ -102,31 +103,41 @@ func (dler *Downloader) runDownloadLoop() ([]toDownload, error) {
 	return media, nil
 }
 
+// applyFilters applies every filter from the slice of []Filter and returns the mutated slice
+// if there are no filters, the original slice is returned
 func (dler *Downloader) applyFilters(dl []toDownload, fs []Filter) []toDownload {
 	if len(fs) == 0 { // return the original posts if there are no filters
 		return dl
 	}
 	dler.log.Debug("Filtering posts...")
 
-	f := make([]toDownload, 0, dler.s.Count)
+	f := make([]toDownload, 0, dler.ds.Count)
 	for _, ff := range fs {
-		f = append(f, ff.Filter(dl, dler.s)...)
+		f = append(f, ff.Filter(dl, dler.ds)...)
 	}
 	return f
 }
 
-// runSaveLoop is the loop for saving files to disk. It takes a slice of `downloadable` and a directory string and tries
+// saveLoop is the loop for saving files to disk. It takes a slice of `downloadable` and a directory string and tries
 //  to download every media file to the specified directory.
-func (dler *Downloader) runSaveLoop(media []toDownload) (uint32, error) {
-	if err := utils.NavigateToDirectory(dler.s.Directory, true); err != nil {
-		return 0, fmt.Errorf("failed to navigate to directory, error: %v, directory: %v", err, dler.s.Directory)
+func (dler *Downloader) saveLoop(media []toDownload) (uint32, error) {
+	if err := utils.NavigateToDirectory(dler.ds.Directory, true); err != nil {
+		return 0, fmt.Errorf("failed to navigate to directory, error: %v, directory: %v", err, dler.ds.Directory)
 	}
 
 	var total, finished, failed uint32
 	total = uint32(len(media))
 
-	if dler.s.ShowProgress {
-		printDownloadStatus(&total, &finished, &failed)
+	if dler.ds.ShowProgress {
+		go func(total, finished, failed *uint32) {
+			for {
+				fmt.Printf("\rTotal images: %d, Finished: %d, Failed: %d", *total, *finished, *failed)
+				if *total == (*finished + *failed) {
+					fmt.Println()
+					return
+				}
+			}
+		}(&total, &finished, &failed)
 	}
 
 	wg := new(sync.WaitGroup)
@@ -139,7 +150,7 @@ func (dler *Downloader) runSaveLoop(media []toDownload) (uint32, error) {
 				atomic.AddUint32(&finished, 1)
 			}
 			wg.Done()
-		}(dler.cl, v)
+		}(dler.client, v)
 	}
 	wg.Wait()
 	return finished, nil
@@ -148,10 +159,10 @@ func (dler *Downloader) runSaveLoop(media []toDownload) (uint32, error) {
 // getPosts fetches a json file from reddit containing information about the posts using the given configuration.
 func (dler *Downloader) getPosts() (*posts, error) {
 	URL := fmt.Sprintf("https://www.reddit.com/r/%s/%s.json?limit=%d&t=%s",
-		dler.s.Subreddit, dler.s.Sorting, dler.s.Count, dler.s.Timeframe)
+		dler.ds.Subreddit, dler.ds.Sorting, dler.ds.Count, dler.ds.Timeframe)
 
 	if len(dler.after) > 0 {
-		URL = fmt.Sprintf("%s&after=%s&count=%d", URL, dler.after, dler.s.Count)
+		URL = fmt.Sprintf("%s&after=%s&count=%d", URL, dler.after, dler.ds.Count)
 	}
 
 	request, err := http.NewRequest("GET", URL, nil)
@@ -160,7 +171,7 @@ func (dler *Downloader) getPosts() (*posts, error) {
 	}
 	request.Header.Add("User-Agent", "go:getter")
 
-	response, err := dler.cl.Do(request)
+	response, err := dler.client.Do(request)
 	if err != nil {
 		return nil, fmt.Errorf("fetching from reddit failed, error: %v, URL: %v", err, URL)
 	}
@@ -184,7 +195,7 @@ func (dler *Downloader) getPosts() (*posts, error) {
 
 // downloadMedia downloads a single media file and stores it in the specified directory.
 func (dler *Downloader) downloadMedia(v *toDownload) error {
-	response, err := dler.cl.Get(v.Data.URL)
+	response, err := dler.client.Get(v.Data.URL)
 	if err != nil {
 		return err
 	}
@@ -241,10 +252,10 @@ func (dler *Downloader) postsToMedia(posts *posts) []toDownload {
 	dler.log.Debug("Converting posts to media...")
 	media := make([]toDownload, 0)
 	for _, post := range posts.Data.Children {
-		if post.Data.IsVideo && dler.s.IncludeVideo {
+		if post.Data.IsVideo && dler.ds.IncludeVideo {
 			media = append(media, toDownload{
 				Name:    post.Data.Title,
-				Data:    createVideo(&post.Data.Media.RedditVideo),
+				Data:    newVideo(&post.Data.Media.RedditVideo),
 				IsVideo: true,
 			})
 		} else {
@@ -252,7 +263,7 @@ func (dler *Downloader) postsToMedia(posts *posts) []toDownload {
 				img.Source.URL = strings.ReplaceAll(img.Source.URL, "&amp;s", "&s")
 				media = append(media, toDownload{
 					Name:    post.Data.Title,
-					Data:    createImage(&img),
+					Data:    newImage(&img),
 					IsVideo: false,
 				})
 			}
@@ -261,7 +272,7 @@ func (dler *Downloader) postsToMedia(posts *posts) []toDownload {
 	return media
 }
 
-func createVideo(v *RedditVideo) imgData {
+func newVideo(v *RedditVideo) imgData {
 	v.ScrubberMediaURL = strings.ReplaceAll(v.ScrubberMediaURL, "&amp;s", "&s")
 	d := imgData{
 		URL:    v.ScrubberMediaURL,
@@ -271,7 +282,7 @@ func createVideo(v *RedditVideo) imgData {
 	return d
 }
 
-func createImage(i *image) imgData {
+func newImage(i *image) imgData {
 	i.Source.URL = strings.ReplaceAll(i.Source.URL, "&amp;s", "&s")
 	d := imgData{
 		URL:    i.Source.URL,
@@ -279,17 +290,4 @@ func createImage(i *image) imgData {
 		Height: i.Source.Height,
 	}
 	return d
-}
-
-// printDownloadStatus runs a background goroutine that prints the download status.
-func printDownloadStatus(total *uint32, finished *uint32, failed *uint32) {
-	go func(total, finished, failed *uint32) {
-		for {
-			fmt.Printf("\rTotal images: %d, Finished: %d, Failed: %d", *total, *finished, *failed)
-			if *total == (*finished + *failed) {
-				fmt.Println()
-				return
-			}
-		}
-	}(total, finished, failed)
 }

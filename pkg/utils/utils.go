@@ -42,8 +42,11 @@ func CreateFilename(name, extension string) (string, error) {
 
 // FileExists returns whether the file exists
 func FileExists(filename string) bool {
-	_, err := os.Stat(filename)
-	return os.IsExist(err)
+	fi, err := os.Stat(filename)
+	if err != nil {
+		return os.IsExist(err)
+	}
+	return !fi.IsDir()
 }
 
 const NtfsMaxFilenameLength = 256
