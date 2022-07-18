@@ -14,12 +14,12 @@ var (
 	encodeLevel = zapcore.CapitalColorLevelEncoder
 )
 
-func GetLogger(dev bool) *zap.SugaredLogger {
+func GetLogger(isDev bool) *zap.SugaredLogger {
 	if log != nil {
 		return log.Sugar()
 	}
 
-	if dev {
+	if isDev {
 		cfg = zap.NewDevelopmentEncoderConfig()
 		level = zapcore.DebugLevel
 	} else {

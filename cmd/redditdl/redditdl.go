@@ -23,7 +23,7 @@ var (
 func main() {
 	flag.Parse()
 
-	c := downloader.DownloaderSettings{
+	ds := downloader.DownloaderSettings{
 		Verbose:      *v,
 		ShowProgress: *p,
 		IncludeVideo: *inclVideo,
@@ -36,16 +36,15 @@ func main() {
 		MinHeight:    *h,
 	}
 
-	log := logging.GetLogger(c.Verbose)
+	log := logging.GetLogger(ds.Verbose)
 
 	// Print the configuration
-	log.Debugf("Using parameters: %#v", c)
+	log.Debugf("Using parameters: %#v", ds)
 
 	// Download the media
 	log.Info("Started downloading media")
 
-	dl := downloader.New(c, downloader.Filters)
-	count, err := dl.Download()
+	count, err := downloader.Download(ds, downloader.Filters)
 	if err != nil {
 		log.Fatal("error downloading media", err)
 	}

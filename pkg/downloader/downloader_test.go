@@ -19,8 +19,7 @@ func TestDownload(t *testing.T) {
 		MinHeight:    0,
 	}
 
-	dl := New(cfg, Filters)
-	count, err := dl.Download()
+	count, err := Download(cfg, Filters)
 	if err != nil {
 		t.Fatalf("Download(%#v) error: %v", cfg, err)
 	}

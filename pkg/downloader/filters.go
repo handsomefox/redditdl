@@ -14,24 +14,24 @@ type Filter interface {
 // FilterFunc implements filter interface and expects the function to return a new slice.
 type FilterFunc func([]toDownload, *DownloaderSettings) []toDownload
 
-func (f FilterFunc) Filter(d []toDownload, c *DownloaderSettings) []toDownload {
-	return f(d, c)
+func (f FilterFunc) Filter(td []toDownload, ds *DownloaderSettings) []toDownload {
+	return f(td, ds)
 }
 
 var (
-	whFilter FilterFunc = func(media []toDownload, c *DownloaderSettings) []toDownload {
+	whFilter FilterFunc = func(td []toDownload, ds *DownloaderSettings) []toDownload {
 		f := make([]toDownload, 0)
-		for _, m := range media {
-			if m.Data.Width >= c.MinWidth && m.Data.Height >= c.MinHeight {
+		for _, m := range td {
+			if m.Data.Width >= ds.MinWidth && m.Data.Height >= ds.MinHeight {
 				f = append(f, m)
 			}
 		}
 		return f
 	}
 
-	urlFilter FilterFunc = func(media []toDownload, c *DownloaderSettings) []toDownload {
+	urlFilter FilterFunc = func(td []toDownload, ds *DownloaderSettings) []toDownload {
 		f := make([]toDownload, 0)
-		for _, m := range media {
+		for _, m := range td {
 			if len(m.Data.URL) > 0 && utils.IsURL(m.Data.URL) {
 				f = append(f, m)
 			}
