@@ -5,7 +5,7 @@ go 1.18
 require (
 	github.com/mattn/go-colorable v0.1.12
 	go.uber.org/zap v1.21.0
-	golang.org/x/exp v0.0.0-20220613132600-b0d781184e0d
+	golang.org/x/exp v0.0.0-20220713135740-79cabaa25d75
 )
 
 require (
