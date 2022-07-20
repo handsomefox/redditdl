@@ -1,6 +1,7 @@
 package downloader
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -15,6 +16,7 @@ import (
 
 	"go.uber.org/zap"
 	"golang.org/x/exp/slices"
+	"golang.org/x/sync/errgroup"
 )
 
 var (
@@ -23,8 +25,8 @@ var (
 	after  = ""                   // After is a post ID, which is used to fetch posts after that ID
 )
 
-// DownloaderSettings is the configuration for the Downloader
-type DownloaderSettings struct {
+// Settings is the configuration for the Downloader
+type Settings struct {
 	Verbose      bool   // Verbose turns the logging on or off
 	ShowProgress bool   // ShowProgress indicates whether the application will show the download progress
 	IncludeVideo bool   // IncludeVideo indicates whether the application should download videos as well
@@ -37,117 +39,218 @@ type DownloaderSettings struct {
 	MinHeight    int    // MinHeight Minimal height of the media
 }
 
-// Download downloads the images according to the given configuration
-func Download(ds DownloaderSettings, fs []Filter) (uint32, error) {
-	log = logging.GetLogger(ds.Verbose)
-	media, err := fetchLoop(&ds, fs)
-	if err != nil {
-		return 0, fmt.Errorf("error getting media from reddit: %v", err)
-	}
-
-	return saveLoop(&ds, media)
+// this is saved to disk later
+type file struct {
+	bytes           []byte
+	name, extension string
 }
 
-// this is the fetch loop, where we get needed amount of filtered posts.
-func fetchLoop(ds *DownloaderSettings, fs []Filter) ([]toDownload, error) {
-	media := make([]toDownload, 0, ds.Count)
+// used for showing progress
+type counter struct {
+	queued, finished, failed int64
+}
 
-	for len(media) < ds.Count {
-		log.Debug("Fetching posts")
+// content contains information which is required to filter by resolution,
+// content and store a video or an image.
+type content struct {
+	Name, URL     string
+	Width, Height int
+	IsVideo       bool
+}
 
-		posts, err := getPosts(ds)
-		if err != nil {
-			return nil, fmt.Errorf("error gettings posts: %v", err)
-		}
-		values := postsToMedia(ds, posts.Data.Children)
-		values = applyFilters(ds, values, fs)
+// amount of goroutines downloading media
+// TODO: maybe make this configurable
+const workers = 16
 
-		// Fill until we get the desired amount
-		for _, v := range values {
-			if len(media) >= ds.Count {
+// Download downloads the images according to the given configuration
+func Download(s Settings, fs []Filter) (int64, error) {
+	log = logging.GetLogger(s.Verbose)
+
+	// TODO: maybe separate this into its own struct and add a constructor
+	eg := new(errgroup.Group)
+	fetched := make(chan content)
+	files := make(chan file)
+	c := new(counter)
+
+	// this fetches the posts and sends them to the fetched channel for other goroutines to download
+	eg.Go(func() error {
+		defer close(fetched)
+
+		dls := make([]content, 0, s.Count)
+
+		count := 0
+		for count < s.Count {
+			log.Debug("fetching posts")
+
+			posts, err := getPosts(&s)
+			if err != nil {
+				close(fetched)
+				return fmt.Errorf("error fetching posts: %v", err)
+			}
+
+			log.Debug("Converting posts to content...")
+			cont := postsToContent(&s, posts.Data.Children)
+
+			log.Debug("Filtering posts...")
+			cont = applyFilters(&s, cont, fs)
+
+			for _, v := range cont {
+				if slices.Contains(dls, v) {
+					continue
+				}
+				dls = append(dls, v)
+			}
+
+			for _, v := range dls {
+				if count == s.Count {
+					break
+				}
+				atomic.AddInt64(&c.queued, 1)
+				count++
+				fetched <- v
+			}
+
+			if len(posts.Data.Children) == 0 || posts.Data.After == after || len(posts.Data.After) == 0 {
+				log.Info("no more posts to fetch (or rate limited)")
 				break
 			}
-			if slices.Contains(media, v) {
+			after = posts.Data.After
+
+			log.Debugf("fetching goroutine sleeping")
+			time.Sleep(5 * time.Second)
+		}
+
+		return nil
+	})
+
+	// this downloads the images/videos to a byte slice, creates a filename for them and sends them to the files channel
+	go func() {
+		wg := new(sync.WaitGroup)
+		defer close(files)
+
+		for i := 0; i < workers; i++ {
+			wg.Add(1)
+
+			eg.Go(func() error {
+				for v := range fetched {
+					response, err := client.Get(v.URL)
+					if err != nil {
+						log.Debugf("failed to GET the post URL: %v", err)
+						continue
+					}
+
+					if response.StatusCode != http.StatusOK {
+						log.Debugf("unexpected status code in response: %v", http.StatusText(response.StatusCode))
+						continue
+					}
+
+					var extension string
+					if v.IsVideo {
+						extension = "mp4" // if we didn't manage to figure out the video extension, assume mp4
+					} else {
+						extension = "jpg" // if we didn't manage to figure out the image extension, assume jpg
+					}
+
+					// TODO: maybe find a better way to get file extension from reddit
+					nameAndExt := strings.Split(response.Request.URL.Path, ".")
+					if len(nameAndExt) == 2 {
+						extension = nameAndExt[1]
+					}
+
+					b, err := io.ReadAll(response.Body)
+					if err != nil {
+						log.Debugf("error copying data from body: %v", err)
+						continue
+					}
+					response.Body.Close()
+
+					files <- file{
+						bytes:     b,
+						name:      v.Name,
+						extension: extension,
+					}
+					// log.Debugf("queued file %v for saving", v.Name)
+				}
+				wg.Done()
+				return nil
+			})
+		}
+		wg.Wait()
+	}()
+
+	// this saves the downloaded files to disk
+	eg.Go(func() error {
+		if err := utils.NavigateToDirectory(s.Directory, true); err != nil {
+			atomic.StoreInt64(&c.failed, c.queued)
+			return fmt.Errorf("failed to navigate to directory, error: %v, directory: %v", err, s.Directory)
+		}
+
+		for f := range files {
+			filename, err := utils.CreateFilename(f.name, f.extension)
+			if err != nil {
+				log.Debugf("error creating a filename: %v", err)
 				continue
 			}
-			media = append(media, v)
-		}
 
-		if len(posts.Data.Children) == 0 || posts.Data.After == after || len(posts.Data.After) == 0 {
-			log.Info("There's no more posts to load (or we got rate limited)")
-			break
-		}
-		after = posts.Data.After
+			file, err := os.Create(filename)
+			if err != nil {
+				log.Debugf("error creating a file: %v", err)
+				atomic.AddInt64(&c.failed, 1)
+				continue
+			}
 
-		log.Debug("Current post count: ", len(media))
-		// We will sleep for 7 seconds after each iteration to ensure that we don't hit the rate limiting
-		time.Sleep(7 * time.Second)
+			r := bytes.NewReader(f.bytes)
+			if _, err := io.Copy(file, r); err != nil {
+				if err := os.Remove(filename); err != nil {
+					log.Debugf("error removing file after a failed copy: %v", err)
+					atomic.AddInt64(&c.failed, 1)
+					continue
+				}
+				log.Debugf("error copying file to disk: %v", err)
+				atomic.AddInt64(&c.failed, 1)
+				continue
+			}
+			atomic.AddInt64(&c.finished, 1)
+			log.Debugf("saved file: %v to disk", filename)
+		}
+		return nil
+	})
+
+	// start the progress tracking goroutine
+	if s.ShowProgress {
+		go func(c *counter) {
+			time.Sleep(1 * time.Second)
+			for {
+				log.Infof("Current progress: queued=%d, finished=%d, failed=%d", c.queued, c.finished, c.failed)
+				time.Sleep(2 * time.Second)
+			}
+		}(c)
 	}
-	return media, nil
+
+	return c.finished, eg.Wait()
 }
 
 // applyFilters applies every filter from the slice of []Filter and returns the mutated slice
 // if there are no filters, the original slice is returned
-func applyFilters(ds *DownloaderSettings, td []toDownload, fs []Filter) []toDownload {
+func applyFilters(s *Settings, td []content, fs []Filter) []content {
 	if len(fs) == 0 { // return the original posts if there are no filters
 		return td
 	}
-	log.Debug("Filtering posts...")
 
-	f := make([]toDownload, 0, len(td))
+	f := make([]content, 0, len(td))
 	for _, ff := range fs {
-		f = append(f, ff.Filter(td, ds)...)
+		f = append(f, ff.Filter(td, s)...)
 	}
 	return f
 }
 
-// saveLoop is the loop for saving files to disk. It takes a slice of `downloadable` and a directory string and tries
-//  to download every media file to the specified directory.
-func saveLoop(ds *DownloaderSettings, td []toDownload) (uint32, error) {
-	if err := utils.NavigateToDirectory(ds.Directory, true); err != nil {
-		return 0, fmt.Errorf("failed to navigate to directory, error: %v, directory: %v", err, ds.Directory)
-	}
-
-	var (
-		finished, failed uint32
-		total            = uint32(len(td))
-	)
-
-	if ds.ShowProgress {
-		go func(t, fn, fl *uint32) {
-			for {
-				fmt.Printf("\rTotal images: %d, Finished: %d, Failed: %d", *t, *fn, *fl)
-				if *t == (*fn + *fl) {
-					fmt.Println()
-					return
-				}
-			}
-		}(&total, &finished, &failed)
-	}
-
-	wg := new(sync.WaitGroup)
-	for _, v := range td {
-		wg.Add(1)
-		go func(data toDownload) {
-			if err := downloadMedia(&data); err != nil {
-				atomic.AddUint32(&failed, 1)
-			} else {
-				atomic.AddUint32(&finished, 1)
-			}
-			wg.Done()
-		}(v)
-	}
-	wg.Wait()
-	return finished, nil
-}
-
 // getPosts fetches a json file from reddit containing information about the posts using the given configuration.
-func getPosts(ds *DownloaderSettings) (*posts, error) {
+func getPosts(s *Settings) (*posts, error) {
 	URL := fmt.Sprintf("https://www.reddit.com/r/%s/%s.json?limit=%d&t=%s",
-		ds.Subreddit, ds.Sorting, ds.Count, ds.Timeframe)
+		s.Subreddit, s.Sorting, s.Count, s.Timeframe)
 
 	if len(after) > 0 {
-		URL = fmt.Sprintf("%s&after=%s&count=%d", URL, after, ds.Count)
+		URL = fmt.Sprintf("%s&after=%s&count=%d", URL, after, s.Count)
 	}
 
 	request, err := http.NewRequest("GET", URL, nil)
@@ -173,58 +276,12 @@ func getPosts(ds *DownloaderSettings) (*posts, error) {
 	return posts, nil
 }
 
-// downloadMedia downloads a single media file and stores it in the specified directory.
-func downloadMedia(td *toDownload) error {
-	response, err := client.Get(td.Data.URL)
-	if err != nil {
-		return err
-	}
-	defer response.Body.Close()
-
-	if response.StatusCode != http.StatusOK {
-		return fmt.Errorf("unexpected status in response: %v", http.StatusText(response.StatusCode))
-	}
-
-	var extension string
-	if td.IsVideo {
-		extension = "mp4" // if we didn't manage to figure out the video extension, assume mp4
-	} else {
-		extension = "jpg" // if we didn't manage to figure out the image extension, assume jpg
-	}
-
-	nameAndExt := strings.Split(response.Request.URL.Path, ".")
-	if len(nameAndExt) == 2 {
-		extension = nameAndExt[1]
-	}
-
-	filename, err := utils.CreateFilename(td.Name, extension)
-	if err != nil {
-		return fmt.Errorf("error when downloading to disk: %v", err)
-	}
-
-	file, err := os.Create(filename)
-	if err != nil {
-		return fmt.Errorf("error when creating a file: %v", err)
-	}
-	defer file.Close()
-
-	if _, err = io.Copy(file, response.Body); err != nil {
-		if err := os.Remove(filename); err != nil {
-			return fmt.Errorf("error when deleting the created file after a failed copy: %v", err)
-		}
-		return fmt.Errorf("error when copying the file to disk: %v", err)
-	}
-
-	return nil
-}
-
-// Converts posts to media depending on the configuration, leaving only the required types of media in
-func postsToMedia(ds *DownloaderSettings, cd []child) []toDownload {
-	log.Debug("Converting posts to media...")
-	media := make([]toDownload, 0)
+// Converts posts to content depending on the configuration, leaving only the required types of media in
+func postsToContent(s *Settings, cd []child) []content {
+	media := make([]content, 0)
 
 	for _, v := range cd {
-		if v.Data.IsVideo && ds.IncludeVideo { // Append video
+		if v.Data.IsVideo && s.IncludeVideo { // Append video
 			media = append(media, newVideo(v.Data.Title, &v.Data.Media.RedditVideo))
 		} else { // Append images
 			for _, img := range v.Data.Preview.Images {
@@ -236,26 +293,22 @@ func postsToMedia(ds *DownloaderSettings, cd []child) []toDownload {
 	return media
 }
 
-func newVideo(title string, rv *RedditVideo) toDownload {
-	return toDownload{
-		Name: title,
-		Data: imgData{
-			URL:    strings.ReplaceAll(rv.ScrubberMediaURL, "&amp;s", "&s"),
-			Width:  rv.Width,
-			Height: rv.Height,
-		},
+func newVideo(title string, rv *RedditVideo) content {
+	return content{
+		Name:    title,
+		URL:     strings.ReplaceAll(rv.ScrubberMediaURL, "&amp;s", "&s"),
+		Width:   rv.Width,
+		Height:  rv.Height,
 		IsVideo: true,
 	}
 }
 
-func newImage(title string, id *imageData) toDownload {
-	return toDownload{
-		Name: title,
-		Data: imgData{
-			URL:    strings.ReplaceAll(id.URL, "&amp;s", "&s"),
-			Width:  id.Width,
-			Height: id.Height,
-		},
+func newImage(title string, id *imageData) content {
+	return content{
+		Name:    title,
+		URL:     strings.ReplaceAll(id.URL, "&amp;s", "&s"),
+		Width:   id.Width,
+		Height:  id.Height,
 		IsVideo: false,
 	}
 }
