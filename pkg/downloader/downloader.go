@@ -84,7 +84,6 @@ func Download(s Settings, fs []Filter) (int64, error) {
 
 			posts, err := getPosts(&s)
 			if err != nil {
-				close(fetched)
 				return fmt.Errorf("error fetching posts: %v", err)
 			}
 
