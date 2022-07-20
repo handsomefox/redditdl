@@ -1,18 +1,5 @@
 package downloader
 
-// toDownload contains information which is required to filter by resolution,
-// download and store a video or an image.
-type toDownload struct {
-	Name    string
-	Data    imgData
-	IsVideo bool
-}
-
-type imgData struct {
-	URL           string
-	Width, Height int
-}
-
 type posts struct {
 	Kind string    `json:"kind"`
 	Data postsData `json:"data"`
