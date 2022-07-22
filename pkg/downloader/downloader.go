@@ -37,6 +37,7 @@ type Settings struct {
 	Count        int    // Count Amount of media to download
 	MinWidth     int    // MinWidth Minimal width of the media
 	MinHeight    int    // MinHeight Minimal height of the media
+	AspectRatio  string // Aspect ratio is the required media aspect ratio, if none is specified the setting is ignored, format: "16:9"
 }
 
 // this is saved to disk later
