@@ -7,12 +7,13 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"redditdl/pkg/logging"
-	"redditdl/pkg/utils"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"redditdl/pkg/logging"
+	"redditdl/pkg/utils"
 
 	"go.uber.org/zap"
 	"golang.org/x/exp/slices"

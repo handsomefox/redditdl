@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+
 	"redditdl/pkg/downloader"
 	"redditdl/pkg/logging"
 )
