@@ -237,8 +237,9 @@ func applyFilters(s *Settings, td []content, fs []Filter) []content {
 	}
 
 	f := make([]content, 0, len(td))
+	f = append(f, td...)
 	for _, ff := range fs {
-		f = append(f, ff.Filter(td, s)...)
+		f = ff.Filter(f, s)
 	}
 	return f
 }
