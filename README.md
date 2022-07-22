@@ -12,6 +12,8 @@ go build --ldflags "-s -w" -o redditdl
 
 ```text
 Usage of redditdl:
+  -ar string (format: "16:9")
+        Aspect ratio is the required media aspect ratio, if none is specified the setting is ignored (default "")
   -cnt
       Amount of media to download (default 1)
   -dir

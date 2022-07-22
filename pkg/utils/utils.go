@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"net/url"
 	"os"
@@ -102,4 +103,10 @@ func NavigateToDirectory(dir string, createDir bool) error {
 		return fmt.Errorf("error navigating to directory, %v", err)
 	}
 	return nil
+}
+
+const float64Epsilon = 1e-9
+
+func CompareFloat64(a, b float64) bool {
+	return math.Abs(a-b) <= float64Epsilon
 }

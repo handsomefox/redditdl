@@ -126,3 +126,25 @@ func TestFileExists(t *testing.T) {
 		}
 	}
 }
+
+func TestCompareFloat64(t *testing.T) {
+	tests := []struct {
+		a, b float64
+	}{
+		{16.0 / 9.0, 1920.0 / 1080.0},
+		{16.0 / 9.0, 1280.0 / 720.0},
+		{16.0 / 9.0, 2560.0 / 1440.0},
+		{16.0 / 10.0, 1280.0 / 800.0},
+		{16.0 / 10.0, 1440.0 / 900.0},
+		{16.0 / 10.0, 1920.0 / 1200.0},
+		{4.0 / 3.0, 640.0 / 480.0},
+		{4.0 / 3.0, 800.0 / 600.0},
+		{4.0 / 3.0, 1600.0 / 1200.0},
+	}
+
+	for _, test := range tests {
+		if !CompareFloat64(test.a, test.b) {
+			t.Errorf("CompareFloat64(%v, %v) not true", test.a, test.b)
+		}
+	}
+}
