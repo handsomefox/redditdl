@@ -37,6 +37,7 @@ type Settings struct {
 	Count        int    // Count Amount of media to download
 	MinWidth     int    // MinWidth Minimal width of the media
 	MinHeight    int    // MinHeight Minimal height of the media
+	Orientation  string // Orientation Specifies the image orientation ("l" for landscape, "p" for portrait, empty for any)
 }
 
 // this is saved to disk later

@@ -12,6 +12,8 @@ go build --ldflags "-s -w" -o redditdl
 
 ```text
 Usage of redditdl:
+  -ort string
+        Specifies the image orientation ("l" for landscape, "p" for portrait, empty for any) (default "")
   -cnt
       Amount of media to download (default 1)
   -dir
