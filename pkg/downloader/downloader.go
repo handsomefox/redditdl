@@ -101,7 +101,11 @@ func (dl *downloader) download(settings *Settings, filters []Filter) (int64, err
 
 	wg.Wait()
 
-	terminate <- 1
+	if settings.ShowProgress {
+		terminate <- 1
+	}
+
+	close(terminate)
 
 	return dl.counter.finished, err
 }
