@@ -312,7 +312,7 @@ func postsToContent(s *Settings, cd []child) []content {
 }
 
 func (dl *downloader) showProgress() {
-	for (dl.counter.finished + dl.counter.failed) != dl.counter.queued {
+	for {
 		dl.log.Infof("Current progress: queued=%d, finished=%d, failed=%d",
 			dl.counter.queued, dl.counter.finished, dl.counter.failed)
 		time.Sleep(time.Second)
