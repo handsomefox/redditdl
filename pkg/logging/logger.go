@@ -6,18 +6,19 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-var (
-	log         *zap.Logger
-	cfg         zapcore.EncoderConfig
-	level       zapcore.Level
-	encodeTime  = zapcore.RFC3339TimeEncoder
-	encodeLevel = zapcore.CapitalColorLevelEncoder
-)
+var log *zap.Logger
 
 func GetLogger(isDev bool) *zap.SugaredLogger {
 	if log != nil {
 		return log.Sugar()
 	}
+
+	var (
+		cfg         zapcore.EncoderConfig
+		level       zapcore.Level
+		encodeTime  = zapcore.RFC3339TimeEncoder
+		encodeLevel = zapcore.CapitalColorLevelEncoder
+	)
 
 	if isDev {
 		cfg = zap.NewDevelopmentEncoderConfig()
@@ -36,6 +37,5 @@ func GetLogger(isDev bool) *zap.SugaredLogger {
 		level,
 	))
 
-	defer log.Sync()
 	return log.Sugar()
 }

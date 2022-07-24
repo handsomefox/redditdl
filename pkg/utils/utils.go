@@ -12,13 +12,17 @@ import (
 	"time"
 )
 
+const (
+	clientTimeout = time.Minute
+)
+
 // CreateClient returns a pointer to http.Client configured to work with reddit.
 func CreateClient() *http.Client {
 	return &http.Client{
 		Transport: &http.Transport{
 			TLSNextProto: map[string]func(authority string, c *tls.Conn) http.RoundTripper{},
 		},
-		Timeout: 60 * time.Second,
+		Timeout: clientTimeout,
 	}
 }
 
@@ -26,39 +30,42 @@ func CreateClient() *http.Client {
 func CreateFilename(name, extension string) (string, error) {
 	formatted, err := formatFilename(name, extension)
 	if err != nil {
-		return "", fmt.Errorf("error creating filename (%v): %v", name, err)
+		return "", fmt.Errorf("error creating filename (%v): %w", name, err)
 	}
 
 	// Resolve duplicates
 	for i := 0; FileExists(formatted); i++ {
 		formatted, err = formatFilename("("+strconv.Itoa(i)+") "+name, extension)
 		if err != nil {
-			return "", fmt.Errorf("error creating filename (%v): %v", name, err)
+			return "", fmt.Errorf("error creating filename (%v): %w", name, err)
 		}
 	}
 
 	return formatted, nil
 }
 
-// FileExists returns whether the file exists
+// FileExists returns whether the file exists.
 func FileExists(filename string) bool {
 	fi, err := os.Stat(filename)
 	if err != nil {
 		return os.IsExist(err)
 	}
+
 	return !fi.IsDir()
 }
 
 const NtfsMaxFilenameLength = 256
 
-// formatFilename ensures that the filename is valid for NTFS and has the right extension
+// formatFilename ensures that the filename is valid for NTFS and has the right extension.
 func formatFilename(filename, extension string) (string, error) {
 	if len(filename) == 0 {
-		return "", fmt.Errorf("empty filename")
+		return "", ErrEmptyFilename
 	}
+
 	if len(extension) == 0 {
-		return "", fmt.Errorf("file should have an extension")
+		return "", ErrEmptyExtension
 	}
+
 	filename = removeForbiddenChars(filename)
 	extension = removeForbiddenChars(extension)
 
@@ -71,20 +78,24 @@ func formatFilename(filename, extension string) (string, error) {
 	return filename + "." + extension, nil
 }
 
-var forbiddenChars = []string{"/", "<", ">", ":", "\"", "\\", "|", "?", "*"}
-
-// removeForbiddenChars removes invalid characters for Linux/Windows filenames
+// removeForbiddenChars removes invalid characters for Linux/Windows filenames.
 func removeForbiddenChars(name string) string {
-	result := name
+	var (
+		forbiddenChars = []string{"/", "<", ">", ":", "\"", "\\", "|", "?", "*"}
+		result         = name
+	)
+
 	for _, c := range forbiddenChars {
 		result = strings.ReplaceAll(result, c, "")
 	}
+
 	return result
 }
 
-// IsURL checks if the URL is valid
+// IsURL checks if the URL is valid.
 func IsURL(str string) bool {
 	u, err := url.ParseRequestURI(str)
+
 	return err == nil && u.Host != "" && u.Scheme != ""
 }
 
@@ -93,13 +104,14 @@ func NavigateToDirectory(dir string, createDir bool) error {
 	if createDir {
 		if err := os.Mkdir(dir, os.ModePerm); err != nil {
 			if !errors.Is(err, os.ErrExist) {
-				return fmt.Errorf("error creating a directory, %v", err)
+				return fmt.Errorf("error creating a directory, %w", err)
 			}
 		}
 	}
 
 	if err := os.Chdir(dir); err != nil {
-		return fmt.Errorf("error navigating to directory, %v", err)
+		return fmt.Errorf("error navigating to directory, %w", err)
 	}
+
 	return nil
 }

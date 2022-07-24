@@ -26,16 +26,16 @@ type childData struct {
 }
 
 type RedditVideo struct {
-	BitrateKbps       int    `json:"bitrate_kbps"`
 	FallbackURL       string `json:"fallback_url"`
-	Height            int    `json:"height"`
-	Width             int    `json:"width"`
+	TranscodingStatus string `json:"transcoding_status"`
 	ScrubberMediaURL  string `json:"scrubber_media_url"`
 	DashURL           string `json:"dash_url"`
-	Duration          int    `json:"duration"`
 	HlsURL            string `json:"hls_url"`
+	BitrateKbps       int    `json:"bitrate_kbps"`
+	Height            int    `json:"height"`
+	Duration          int    `json:"duration"`
+	Width             int    `json:"width"`
 	IsGif             bool   `json:"is_gif"`
-	TranscodingStatus string `json:"transcoding_status"`
 }
 
 type imageData struct {
@@ -49,7 +49,7 @@ type preview struct {
 }
 
 type image struct {
-	Source      imageData   `json:"source"`
-	Resolutions []imageData `json:"resolutions"`
 	ID          string      `json:"id"`
+	Resolutions []imageData `json:"resolutions"`
+	Source      imageData   `json:"source"`
 }

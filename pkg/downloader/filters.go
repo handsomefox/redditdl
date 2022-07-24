@@ -1,18 +1,21 @@
 package downloader
 
-import (
-	"redditdl/pkg/utils"
-)
+import "redditdl/pkg/utils"
 
-// You can mutate this slice to contain your own filters.
-var Filters = []Filter{whFilter, urlFilter, orientationFilter}
+func DefaultFilters() []Filter {
+	return []Filter{
+		FilterWidthHeight(),
+		FilterURLs(),
+		FilterOrientation(),
+	}
+}
 
 // Interface that filters the given slice and returns the mutated version of it.
 type Filter interface {
 	Filter([]content, *Settings) []content
 }
 
-// []downloadable according to its own logic.
+// []content according to its own logic.
 // FilterFunc implements filter interface and expects the function to return a new slice.
 type FilterFunc func([]content, *Settings) []content
 
@@ -20,48 +23,77 @@ func (f FilterFunc) Filter(c []content, s *Settings) []content {
 	return f(c, s)
 }
 
-var (
-	whFilter FilterFunc = func(c []content, s *Settings) []content {
-		f := make([]content, 0)
-		for _, m := range c {
-			if m.Width >= s.MinWidth && m.Height >= s.MinHeight {
-				f = append(f, m)
-			}
-		}
-		return f
-	}
+// FilterWidthHeight filters images by specified width and height from settings.
+func FilterWidthHeight() FilterFunc {
+	return func(cont []content, settings *Settings) []content {
+		filtered := make([]content, 0)
 
-	urlFilter FilterFunc = func(c []content, s *Settings) []content {
-		f := make([]content, 0)
-		for _, m := range c {
-			if len(m.URL) > 0 && utils.IsURL(m.URL) {
-				f = append(f, m)
+		for _, m := range cont {
+			if m.Width >= settings.MinWidth && m.Height >= settings.MinHeight {
+				filtered = append(filtered, m)
 			}
 		}
-		return f
+
+		return filtered
 	}
-	orientationFilter FilterFunc = func(c []content, s *Settings) []content {
-		if s.Orientation == "" || len(s.Orientation) > 1 {
-			return c
+}
+
+// FilterURLs filters out invalid URLs.
+func FilterURLs() FilterFunc {
+	return func(cont []content, settings *Settings) []content {
+		filtered := make([]content, 0)
+
+		for _, m := range cont {
+			if len(m.URL) > 0 && utils.IsURL(m.URL) {
+				filtered = append(filtered, m)
+			}
+		}
+
+		return filtered
+	}
+}
+
+// FilterOrientation filters images by specified orientation.
+func FilterOrientation() FilterFunc {
+	return func(cont []content, settings *Settings) []content {
+		if settings.Orientation == "" || len(settings.Orientation) > 1 {
+			return cont
 		}
 
 		var landscape, portrait bool
-		if s.Orientation == "l" {
+		if settings.Orientation == "l" {
 			landscape = true
-		} else if s.Orientation == "p" {
+		} else if settings.Orientation == "p" {
 			portrait = true
 		}
 
-		log.Debugf("%#v, %#v", landscape, portrait)
+		filtered := make([]content, 0)
 
-		f := make([]content, 0)
-		for _, m := range c {
+		for _, m := range cont {
 			if landscape && m.Width > m.Height {
-				f = append(f, m)
+				filtered = append(filtered, m)
 			} else if portrait && m.Width < m.Height {
-				f = append(f, m)
+				filtered = append(filtered, m)
 			}
 		}
-		return f
+
+		return filtered
 	}
-)
+}
+
+// applyFilters applies every filter from the slice of []Filter and returns the mutated slice
+// if there are no filters, the original slice is returned.
+func applyFilters(settings *Settings, cont []content, filters []Filter) []content {
+	if len(filters) == 0 { // return the original posts if there are no filters
+		return cont
+	}
+
+	filtered := make([]content, 0, len(cont))
+	filtered = append(filtered, cont...)
+
+	for _, ff := range filters {
+		filtered = ff.Filter(filtered, settings)
+	}
+
+	return filtered
+}

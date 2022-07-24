@@ -1,31 +1,24 @@
-package utils
+package utils_test
 
 import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"redditdl/pkg/utils"
 )
 
 func TestCreateClient(t *testing.T) {
-	client := CreateClient()
-	if client == nil {
+	t.Parallel()
+
+	if client := utils.CreateClient(); client == nil {
 		t.Error("Failed to create client") // this will never happen
 	}
 }
 
-func TestRemoveForbiddenChars(t *testing.T) {
-	s := ""
-	for _, v := range forbiddenChars {
-		s += v
-	}
-
-	s = removeForbiddenChars(s)
-	if s != "" {
-		t.Error("removeForbiddenChars() unexpected test result")
-	}
-}
-
 func TestCreateFilename(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name, extension, want string
 	}{
@@ -36,7 +29,7 @@ func TestCreateFilename(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		got, _ := CreateFilename(test.name, test.extension)
+		got, _ := utils.CreateFilename(test.name, test.extension)
 		if got != test.want {
 			t.Errorf("CreateFilename(%#v) unexpected result, got: %v, want: %v", test, got, test.want)
 		}
@@ -44,6 +37,8 @@ func TestCreateFilename(t *testing.T) {
 }
 
 func TestIsURL(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		url  string
 		want bool
@@ -57,7 +52,7 @@ func TestIsURL(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		got := IsURL(test.url)
+		got := utils.IsURL(test.url)
 		if got != test.want {
 			t.Errorf("TestIsURL(%#v) unexpected result, got: %v, want: %v", test, got, test.want)
 		}
@@ -65,6 +60,8 @@ func TestIsURL(t *testing.T) {
 }
 
 func TestNavigateToDirectory(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		dir         string
 		create      bool
@@ -76,7 +73,7 @@ func TestNavigateToDirectory(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		err := NavigateToDirectory(test.dir, test.create)
+		err := utils.NavigateToDirectory(test.dir, test.create)
 
 		if test.shouldError && err == nil {
 			t.Errorf("NavigateToDirectory(%#v) unexpected result, got: %v, want: %#v", test, err, test.shouldError)
@@ -85,11 +82,12 @@ func TestNavigateToDirectory(t *testing.T) {
 		if !test.shouldError && err != nil {
 			t.Errorf("NavigateToDirectory(%#v) unexpected result, got: %v, want: %#v", test, err, test.shouldError)
 		}
-
 	}
 }
 
 func TestFileExists(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name         string
 		create, want bool
@@ -100,24 +98,26 @@ func TestFileExists(t *testing.T) {
 		{"anotherrandomfilename.exe", true, true},
 	}
 
-	_ = NavigateToDirectory(os.TempDir(), false)
-	for i, test := range tests {
+	_ = utils.NavigateToDirectory(os.TempDir(), false)
+
+	for index, test := range tests {
 		if test.create {
-			f, err := os.CreateTemp(os.TempDir(), test.name)
+			file, err := os.CreateTemp(os.TempDir(), test.name)
 			if err != nil {
 				t.Errorf("Couldn't create file, name %v, dir %v", test.name, os.TempDir())
+
 				continue
 			}
 
-			test.name = filepath.Base(f.Name())
-			tests[i].name = filepath.Base(f.Name())
-			defer f.Close()
+			test.name = filepath.Base(file.Name())
+			tests[index].name = filepath.Base(file.Name())
+
+			defer file.Close()
 		}
 
-		if got := FileExists(test.name); got != test.want {
+		if got := utils.FileExists(test.name); got != test.want {
 			t.Errorf("FileExists(%#v) unexpected output, want %v, got %v", test, test.want, got)
 		}
-
 	}
 
 	for _, test := range tests {
