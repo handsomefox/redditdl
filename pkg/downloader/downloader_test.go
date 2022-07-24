@@ -26,7 +26,7 @@ func TestDownload(t *testing.T) {
 		IncludeVideo: false,
 	}
 
-	count, err := downloader.Download(settings, downloader.DefaultFilters())
+	count, err := downloader.Download(&settings, downloader.DefaultFilters())
 	if err != nil {
 		t.Fatalf("Download(%#v) error: %v", settings, err)
 	}
@@ -38,6 +38,7 @@ func TestDownload(t *testing.T) {
 
 func BenchmarkDownload(b *testing.B) {
 	settings := downloader.Settings{
+		Directory:    "",
 		Subreddit:    "wallpaper",
 		Sorting:      "best",
 		Timeframe:    "all",
@@ -54,7 +55,7 @@ func BenchmarkDownload(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		settings.Directory = path.Join(os.TempDir(), strconv.Itoa(i))
-		if _, err := downloader.Download(settings, filters); err != nil {
+		if _, err := downloader.Download(&settings, filters); err != nil {
 			b.Error(err)
 		}
 	}

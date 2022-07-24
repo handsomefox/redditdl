@@ -99,19 +99,21 @@ func TestFileExists(t *testing.T) {
 	_ = utils.NavigateToDirectory(os.TempDir(), false)
 
 	for index, test := range tests {
-		if test.create {
-			file, err := os.CreateTemp(os.TempDir(), test.name)
-			if err != nil {
-				t.Errorf("Couldn't create file, name %v, dir %v", test.name, os.TempDir())
-
-				continue
-			}
-
-			test.name = filepath.Base(file.Name())
-			tests[index].name = filepath.Base(file.Name())
-
-			defer file.Close()
+		if !test.create {
+			continue
 		}
+
+		file, err := os.CreateTemp(os.TempDir(), test.name)
+		if err != nil {
+			t.Errorf("Couldn't create file, name %v, dir %v", test.name, os.TempDir())
+
+			continue
+		}
+
+		test.name = filepath.Base(file.Name())
+		tests[index].name = filepath.Base(file.Name())
+
+		file.Close()
 	}
 
 	for _, test := range tests {

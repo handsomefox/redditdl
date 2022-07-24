@@ -28,7 +28,7 @@ const (
 )
 
 // Download downloads the images according to the given configuration.
-func Download(settings Settings, filters []Filter) (int64, error) {
+func Download(settings *Settings, filters []Filter) (int64, error) {
 	dl := downloader{
 		client:  utils.CreateClient(),
 		log:     logging.GetLogger(settings.Verbose),
@@ -36,5 +36,5 @@ func Download(settings Settings, filters []Filter) (int64, error) {
 		counter: counter{queued: 0, finished: 0, failed: 0},
 	}
 
-	return dl.download(&settings, filters)
+	return dl.download(settings, filters)
 }

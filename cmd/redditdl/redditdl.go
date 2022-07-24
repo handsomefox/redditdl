@@ -47,7 +47,7 @@ func main() {
 	// Download the media
 	log.Info("Started downloading media")
 
-	count, err := downloader.Download(settings, downloader.DefaultFilters())
+	count, err := downloader.Download(&settings, downloader.DefaultFilters())
 	if err != nil {
 		log.Fatal("error downloading media", err)
 	}

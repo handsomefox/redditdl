@@ -58,11 +58,11 @@ const NtfsMaxFilenameLength = 256
 
 // formatFilename ensures that the filename is valid for NTFS and has the right extension.
 func formatFilename(filename, extension string) (string, error) {
-	if len(filename) == 0 {
+	if filename == "" {
 		return "", ErrEmptyFilename
 	}
 
-	if len(extension) == 0 {
+	if extension == "" {
 		return "", ErrEmptyExtension
 	}
 

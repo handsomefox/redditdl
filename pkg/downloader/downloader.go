@@ -148,7 +148,7 @@ func (dl *downloader) fetchPosts(settings *Settings, filters []Filter, fetched c
 			fetched <- value
 		}
 
-		if len(posts.Data.Children) == 0 || posts.Data.After == dl.after || len(posts.Data.After) == 0 {
+		if len(posts.Data.Children) == 0 || posts.Data.After == dl.after || posts.Data.After == "" {
 			dl.log.Info("no more posts to fetch (or rate limited)")
 
 			break
@@ -193,7 +193,7 @@ func (dl *downloader) downloadFiles(files chan file, fetched chan content) {
 			extension = nameAndExt[1]
 		}
 
-		bytes, err := io.ReadAll(response.Body)
+		by, err := io.ReadAll(response.Body)
 		if err != nil {
 			dl.log.Debugf("error copying data from body: %v", err)
 
@@ -202,7 +202,7 @@ func (dl *downloader) downloadFiles(files chan file, fetched chan content) {
 
 		response.Body.Close()
 		files <- file{
-			bytes:     bytes,
+			bytes:     by,
 			name:      value.Name,
 			extension: extension,
 		}
@@ -264,7 +264,7 @@ func (dl *downloader) getPostsFromReddit(settings *Settings) (*posts, error) {
 		URL = fmt.Sprintf("%s&after=%s&count=%d", URL, dl.after, settings.Count)
 	}
 
-	request, err := http.NewRequest("GET", URL, nil)
+	request, err := http.NewRequest("GET", URL, http.NoBody)
 	if err != nil {
 		return nil, fmt.Errorf("error creating a request: %w, URL: %v", err, URL)
 	}
@@ -290,11 +290,12 @@ func (dl *downloader) getPostsFromReddit(settings *Settings) (*posts, error) {
 }
 
 // Converts posts to content depending on the configuration, leaving only the required types of media in.
-func postsToContent(s *Settings, cd []child) []content {
+func postsToContent(settings *Settings, cd []child) []content {
 	media := make([]content, 0)
 
-	for _, value := range cd {
-		if value.Data.IsVideo && s.IncludeVideo { // Append video
+	for i := 0; i < len(cd); i++ {
+		value := &cd[i]
+		if value.Data.IsVideo && settings.IncludeVideo { // Append video
 			media = append(media, content{
 				Name:    value.Data.Title,
 				URL:     strings.ReplaceAll(value.Data.Media.RedditVideo.ScrubberMediaURL, "&amp;s", "&s"),
