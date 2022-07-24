@@ -86,8 +86,6 @@ func TestNavigateToDirectory(t *testing.T) {
 }
 
 func TestFileExists(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		name         string
 		create, want bool
@@ -114,7 +112,9 @@ func TestFileExists(t *testing.T) {
 
 			defer file.Close()
 		}
+	}
 
+	for _, test := range tests {
 		if got := utils.FileExists(test.name); got != test.want {
 			t.Errorf("FileExists(%#v) unexpected output, want %v, got %v", test, test.want, got)
 		}
