@@ -54,11 +54,6 @@ func (dl *downloader) download(settings *Settings, filters []Filter) (int64, err
 		wg      = new(sync.WaitGroup)
 	)
 
-	// start the progress tracking goroutine
-	if settings.ShowProgress {
-		go dl.showProgress()
-	}
-
 	wg.Add(1)
 	// fetching files to fetched chan
 	go func(settings *Settings, filters []Filter, fetched chan content) {
@@ -98,7 +93,15 @@ func (dl *downloader) download(settings *Settings, filters []Filter) (int64, err
 		err = dl.saveFiles(settings, files)
 	}(settings, files)
 
+	terminate := make(chan int8)
+	// start the progress tracking goroutine
+	if settings.ShowProgress {
+		go dl.showProgress(terminate)
+	}
+
 	wg.Wait()
+
+	terminate <- 1
 
 	return dl.counter.finished, err
 }
@@ -311,10 +314,16 @@ func postsToContent(s *Settings, cd []child) []content {
 	return media
 }
 
-func (dl *downloader) showProgress() {
-	for {
-		dl.log.Infof("Current progress: queued=%d, finished=%d, failed=%d",
-			dl.counter.queued, dl.counter.finished, dl.counter.failed)
-		time.Sleep(time.Second)
+func (dl *downloader) showProgress(terminate chan int8) {
+	end := false
+	for !end {
+		select {
+		case <-terminate:
+			end = true
+		default:
+			dl.log.Infof("Current progress: queued=%d, finished=%d, failed=%d",
+				dl.counter.queued, dl.counter.finished, dl.counter.failed)
+			time.Sleep(time.Second)
+		}
 	}
 }
