@@ -15,7 +15,6 @@ type Filter interface {
 	Filter([]content, *Settings) []content
 }
 
-// []content according to its own logic.
 // FilterFunc implements filter interface and expects the function to return a new slice.
 type FilterFunc func([]content, *Settings) []content
 
