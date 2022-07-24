@@ -1,50 +1,61 @@
-package downloader
+package downloader_test
 
 import (
 	"os"
 	"path"
 	"strconv"
 	"testing"
+
+	"redditdl/pkg/downloader"
 )
 
 func TestDownload(t *testing.T) {
-	s := Settings{
-		Verbose:      false,
-		ShowProgress: false,
-		IncludeVideo: false,
+	t.Parallel()
+
+	settings := downloader.Settings{
+		Directory:    os.TempDir(),
 		Subreddit:    "wallpaper",
 		Sorting:      "best",
 		Timeframe:    "all",
-		Directory:    os.TempDir(),
+		Orientation:  "",
 		Count:        5,
 		MinWidth:     0,
 		MinHeight:    0,
+		Verbose:      false,
+		ShowProgress: false,
+		IncludeVideo: false,
 	}
 
-	count, err := Download(s, Filters)
+	count, err := downloader.Download(settings, downloader.DefaultFilters())
 	if err != nil {
-		t.Fatalf("Download(%#v) error: %v", s, err)
+		t.Fatalf("Download(%#v) error: %v", settings, err)
 	}
 
-	if count != int64(s.Count) {
-		t.Fatalf("Download(%#v) loaded %v media, expected %v", s, count, s.Count)
+	if count != int64(settings.Count) {
+		t.Fatalf("Download(%#v) loaded %v media, expected %v", settings, count, settings.Count)
 	}
 }
 
 func BenchmarkDownload(b *testing.B) {
+	settings := downloader.Settings{
+		Subreddit:    "wallpaper",
+		Sorting:      "best",
+		Timeframe:    "all",
+		Orientation:  "",
+		Count:        35,
+		MinWidth:     1920,
+		MinHeight:    1080,
+		Verbose:      false,
+		ShowProgress: false,
+		IncludeVideo: true,
+	}
+
+	filters := downloader.DefaultFilters()
+
 	for i := 0; i < b.N; i++ {
-		s := Settings{
-			Verbose:      false,
-			ShowProgress: false,
-			IncludeVideo: true,
-			Subreddit:    "wallpaper",
-			Sorting:      "best",
-			Timeframe:    "all",
-			Directory:    path.Join(os.TempDir(), strconv.Itoa(i)),
-			Count:        35,
-			MinWidth:     1920,
-			MinHeight:    1080,
+		settings.Directory = path.Join(os.TempDir(), strconv.Itoa(i))
+		if _, err := downloader.Download(settings, filters); err != nil {
+			b.Error(err)
 		}
-		Download(s, Filters)
 	}
 }
