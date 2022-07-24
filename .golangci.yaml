@@ -1,103 +1,108 @@
 linters-settings:
+  govet:
+    check-shadowing: false
+    enable:
+      - assign
+      - atomic
+      - atomicalign
+      - bools
+      - copylocks
+      - deepequalerrors
+      - errorsas
+      - fieldalignment
+      - findcall
+      - httpresponse
+      - ifaceassert
+      - loopclosure
+      - lostcancel
+      - nilfunc
+      - nilness
+      - printf
+      - shift
+      - sortslice
+      - stdmethods
+      - stringintconv
+      - structtag
+      - testinggoroutine
+      - tests
+      - unmarshal
+      - unreachable
+      - unsafeptr
+      - unusedresult
+      - unusedwrite
+
+  errcheck:
+    check-type-assertions: true
+  goconst:
+    min-len: 2
+    min-occurrences: 3
   varnamelen:
     min-name-length: 2
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - experimental
+      - opinionated
+      - performance
+      - style
+  nolintlint:
+    require-specific: true
 
 linters:
-  enable-all: false
+  disable-all: true
   enable:
-    - asasalint
-    - asciicheck
-    - bidichk
-    - containedctx
-    - cyclop
+    # default
     - deadcode
-    - decorder
-    - depguard
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - structcheck
+    - typecheck
+    - unused
+    - varcheck
+    # additional
+    - bidichk
+    - bodyclose
+    - cyclop
     - dogsled
     - dupl
     - durationcheck
-    - errcheck
-    - errchkjson
     - errname
     - errorlint
-    - execinquery
     - exhaustive
     - exportloopref
-    - forbidigo
     - forcetypeassert
-    - funlen
-    - gochecknoglobals
-    - gochecknoinits
-    - gocognit
     - goconst
     - gocritic
-    - gocyclo
     - godot
-    - goerr113
-    - gofmt
-    - goheader
     - goimports
+    - gofmt
     - gomnd
-    - gomoddirectives
-    - gomodguard
-    - goprintffuncname
     - gosec
-    - gosimple
-    - govet
-    - grouper
     - ifshort
-    - importas
-    - ineffassign
-    - ireturn
     - lll
     - maintidx
     - makezero
     - misspell
     - nakedret
     - nestif
+    - nilerr
     - nilnil
     - nlreturn
-    - nolintlint
-    - nonamedreturns
-    - nosnakecase
+    - noctx
     - nosprintfhostport
-    - paralleltest
     - prealloc
     - predeclared
-    - promlinter
     - revive
-    - staticcheck
     - stylecheck
-    - tenv
     - testpackage
     - thelper
-    - typecheck
+    - tparallel
     - unconvert
-    - unparam
-    - unused
-    - varcheck
     - varnamelen
+    - wastedassign
     - whitespace
     - wrapcheck
     - wsl
-
-  disable:
-    - exhaustivestruct
-    - maligned
-    - scopelint
-    - golint
-    - exhaustruct
-    - interfacer
-    - bodyclose
-    - gci
-    - godox
-    - gofumpt
-    - contextcheck
-    - nilerr
-    - noctx
-    - rowserrcheck
-    - sqlclosecheck
-    - structcheck
-    - tagliatelle
-    - tparallel
-    - wastedassign
