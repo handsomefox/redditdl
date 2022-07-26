@@ -233,7 +233,7 @@ func (dl *downloader) saveFiles(settings *Settings, files chan file) error {
 		}
 
 		r := bytes.NewReader(value.bytes)
-		if _, err := io.Copy(file, r); err != nil {
+		if _, err := r.WriteTo(file); err != nil {
 			if err := os.Remove(filename); err != nil {
 				dl.log.Debugf("error removing file after a failed copy: %v", err)
 				atomic.AddInt64(&dl.counter.failed, 1)
