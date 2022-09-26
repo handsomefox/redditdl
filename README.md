@@ -12,25 +12,25 @@ go build --ldflags "-s -w" -o redditdl
 
 ```text
 Usage of redditdl:
-  -ort string
+  -orientation string
         Specifies the image orientation ("l" for landscape, "p" for portrait, empty for any) (default "")
-  -cnt
+  -count
       Amount of media to download (default 1)
   -dir
       Specifies the directory where to download the media (default "media")
-  -h
+  -height
       minimal height of the media to download
-  -w
+  -width
       minimal width of the media to download
-  -p
+  -progress
       Indicates whether the application will show the download progress
   -sort
       How to sort (controversial, best, hot, new, random, rising, top) (default "top")
   -sub
       Subreddit name (default "wallpaper")
-  -tf
+  -timeframe
       Timeframe from which to get the posts (hour, day, week, month, year, all) (default "all")
-  -v
+  -verbose
       Turns the logging on or off
   -video
       Indicates whether the application should download videos as well
@@ -40,5 +40,5 @@ Usage of redditdl:
 ## Example
 
 ```bash
-redditdl -cnt 5 -dir example
+redditdl -count 5 -dir example -verbose -progress
 ```
