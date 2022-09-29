@@ -60,7 +60,6 @@ linters:
     - typecheck
     - unused
     - varcheck
-    # additional
     - bidichk
     - bodyclose
     - cyclop
@@ -99,8 +98,7 @@ linters:
     - thelper
     - tparallel
     - unconvert
-    # - varnamelen
     - wastedassign
     - whitespace
     - wrapcheck
-    - wsl
+    # wsl
