@@ -31,7 +31,7 @@ func TestDownload(t *testing.T) {
 		t.Fatalf("Download(%#v) error: %v", settings, err)
 	}
 
-	if count != int64(settings.Count) {
+	if count != settings.Count {
 		t.Fatalf("Download(%#v) loaded %v media, expected %v", settings, count, settings.Count)
 	}
 }

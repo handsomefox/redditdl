@@ -14,7 +14,7 @@ type Settings struct {
 	Sorting      string
 	Timeframe    string
 	Orientation  string
-	Count        int
+	Count        int64
 	MinWidth     int
 	MinHeight    int
 	Verbose      bool
@@ -33,7 +33,7 @@ func Download(settings *Settings, filters []Filter) (int64, error) {
 		client:  utils.CreateClient(),
 		log:     logging.GetLogger(settings.Verbose),
 		after:   "",
-		counter: counter{queued: 0, finished: 0, failed: 0},
+		counter: counter{},
 	}
 
 	return dl.download(settings, filters)

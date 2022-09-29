@@ -2,6 +2,7 @@ package downloader
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -34,123 +35,112 @@ type file struct {
 
 // used for showing progress.
 type counter struct {
-	queued, finished, failed int64
+	queued, finished, failed atomic.Int64
 }
 
-// content contains information which is required to filter by resolution,
-// content and store a video or an image.
-type content struct {
-	Name, URL     string
+// Content contains information which is required to filter by resolution,
+// Content and store a video or an image.
+type Content struct {
+	Name          string
+	URL           string
 	Width, Height int
 	IsVideo       bool
 }
 
 func (dl *downloader) download(settings *Settings, filters []Filter) (int64, error) {
 	var (
-		err error = nil
+		contentChan = make(chan Content)
+		filesChan   = make(chan file)
 
-		fetched = make(chan content)
-		files   = make(chan file)
-		wg      = new(sync.WaitGroup)
+		err error
+		wg  sync.WaitGroup
 	)
 
 	wg.Add(1)
-	// fetching files to fetched chan
-	go func(settings *Settings, filters []Filter, fetched chan content) {
+	// fetching files to content chan
+	go func(ss *Settings, fs []Filter, c chan Content) {
 		defer wg.Done()
-		defer close(fetched)
+		defer close(c)
 
-		if err := dl.fetchPosts(settings, filters, fetched); err != nil {
-			dl.log.Debugf("error fetching posts: %w", err)
+		if err := dl.fetchPosts(ss, fs, c); err != nil {
+			dl.log.Debugf("error fetching posts: %s", err.Error())
 		}
-	}(settings, filters, fetched)
+	}(settings, filters, contentChan)
 
 	wg.Add(1)
-	// downloading the files from fetched chan to files chan using multiple goroutines
-	go func(files chan file, fetched chan content) {
-		defer close(files)
+	// downloading the files from content chan to files chan using multiple goroutines
+	go func(f chan file, c chan Content) {
+		defer close(f)
 		defer wg.Done()
 
-		wg := new(sync.WaitGroup)
+		var wg sync.WaitGroup
 
 		for i := 0; i < workerCount; i++ {
 			wg.Add(1)
-
-			go func(files chan file, fetched chan content) {
+			go func(f chan file, c chan Content) {
 				defer wg.Done()
-				dl.downloadFiles(files, fetched)
-			}(files, fetched)
+				dl.downloadFiles(f, c)
+			}(f, c)
 		}
-
 		wg.Wait()
-	}(files, fetched)
+	}(filesChan, contentChan)
 
 	wg.Add(1)
 	// saving files to disk
-	go func(settings *Settings, files chan file) {
+	go func(ss *Settings, c chan file) {
 		defer wg.Done()
-
-		err = dl.saveFiles(settings, files)
-	}(settings, files)
+		err = dl.saveFiles(ss, c)
+	}(settings, filesChan)
 
 	terminate := make(chan int8)
 	// start the progress tracking goroutine
 	if settings.ShowProgress {
 		go dl.showProgress(terminate)
 	}
-
 	wg.Wait()
-
 	if settings.ShowProgress {
 		terminate <- 1
 	}
-
 	close(terminate)
 
-	return dl.counter.finished, err
+	return dl.counter.finished.Load(), err
 }
 
-func (dl *downloader) fetchPosts(settings *Settings, filters []Filter, fetched chan content) error {
-	dls := make([]content, 0, settings.Count)
+func (dl *downloader) fetchPosts(settings *Settings, filters []Filter, contentChan chan Content) error {
+	downloads := make([]Content, 0, settings.Count)
 
-	count := 0
+	var count int64
 	for count < settings.Count {
 		dl.log.Debug("fetching posts")
-
 		posts, err := dl.getPostsFromReddit(settings)
 		if err != nil {
 			return fmt.Errorf("error fetching posts: %w", err)
 		}
 
 		dl.log.Debug("Converting posts to content...")
-
-		cont := postsToContent(settings, posts.Data.Children)
+		content := postsToContent(settings, posts.Data.Children)
 
 		dl.log.Debug("Filtering posts...")
+		content = applyFilters(settings, content, filters)
 
-		cont = applyFilters(settings, cont, filters)
-
-		for _, v := range cont {
-			if slices.Contains(dls, v) {
+		for _, c := range content {
+			if slices.Contains(downloads, c) {
 				continue
 			}
-
-			dls = append(dls, v)
+			downloads = append(downloads, c)
 		}
 
-		for _, value := range dls {
+		for _, d := range downloads {
 			if count == settings.Count {
 				break
 			}
-
-			atomic.AddInt64(&dl.counter.queued, 1)
+			dl.counter.queued.Add(1)
 			count++
-			fetched <- value
+			contentChan <- d
 		}
 
 		if len(posts.Data.Children) == 0 || posts.Data.After == dl.after || posts.Data.After == "" {
 			dl.log.Info("no more posts to fetch (or rate limited)")
-
 			break
 		}
 
@@ -162,23 +152,26 @@ func (dl *downloader) fetchPosts(settings *Settings, filters []Filter, fetched c
 	return nil
 }
 
-func (dl *downloader) downloadFiles(files chan file, fetched chan content) {
-	for value := range fetched {
-		response, err := dl.client.Get(value.URL)
+func (dl *downloader) downloadFiles(filesChan chan file, contentChan chan Content) {
+	for content := range contentChan {
+		request, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, content.URL, http.NoBody)
 		if err != nil {
-			dl.log.Debugf("failed to GET the post URL: %v", err)
+			dl.log.Debug(err)
+		}
 
+		response, err := dl.client.Do(request)
+		if err != nil {
+			dl.log.Debug(err)
 			continue
 		}
 
 		if response.StatusCode != http.StatusOK {
 			dl.log.Debugf("unexpected status code in response: %v", http.StatusText(response.StatusCode))
-
 			continue
 		}
 
 		var extension string
-		if value.IsVideo {
+		if content.IsVideo {
 			extension = "mp4" // if we didn't manage to figure out the video extension, assume mp4
 		} else {
 			extension = "jpg" // if we didn't manage to figure out the image extension, assume jpg
@@ -186,68 +179,60 @@ func (dl *downloader) downloadFiles(files chan file, fetched chan content) {
 
 		// the URL path is usually equal to something like "randomid.extension",
 		// this way we can get the actual file extension
-		nameAndExt := strings.Split(response.Request.URL.Path, ".")
-		requiredLength := 2
-
-		if len(nameAndExt) == requiredLength {
-			extension = nameAndExt[1]
+		split := strings.Split(response.Request.URL.Path, ".")
+		if len(split) == 2 {
+			extension = split[1]
 		}
 
-		by, err := io.ReadAll(response.Body)
+		b, err := io.ReadAll(response.Body)
 		if err != nil {
 			dl.log.Debugf("error copying data from body: %v", err)
-
 			continue
 		}
 
 		response.Body.Close()
-		files <- file{
-			bytes:     by,
-			name:      value.Name,
+		filesChan <- file{
+			bytes:     b,
+			name:      content.Name,
 			extension: extension,
 		}
 	}
 }
 
-func (dl *downloader) saveFiles(settings *Settings, files chan file) error {
+func (dl *downloader) saveFiles(settings *Settings, filesChan chan file) error {
 	if err := utils.NavigateToDirectory(settings.Directory, true); err != nil {
-		atomic.StoreInt64(&dl.counter.failed, dl.counter.queued)
-
+		dl.counter.failed.Store(dl.counter.queued.Load())
 		return fmt.Errorf("failed to navigate to directory, error: %w, directory: %v", err, settings.Directory)
 	}
 
-	for value := range files {
-		filename, err := utils.CreateFilename(value.name, value.extension)
+	for file := range filesChan {
+		filename, err := utils.CreateFilename(file.name, file.extension)
 		if err != nil {
-			dl.log.Debugf("error creating a filename: %v", err)
-
+			dl.log.Debug(err)
 			continue
 		}
 
-		file, err := os.Create(filename)
+		f, err := os.Create(filename)
 		if err != nil {
 			dl.log.Debugf("error creating a file: %v", err)
-			atomic.AddInt64(&dl.counter.failed, 1)
-
+			dl.counter.failed.Add(1)
 			continue
 		}
 
-		r := bytes.NewReader(value.bytes)
-		if _, err := r.WriteTo(file); err != nil {
+		r := bytes.NewReader(file.bytes)
+		if _, err := r.WriteTo(f); err != nil {
 			if err := os.Remove(filename); err != nil {
 				dl.log.Debugf("error removing file after a failed copy: %v", err)
-				atomic.AddInt64(&dl.counter.failed, 1)
-
+				dl.counter.failed.Add(1)
 				continue
 			}
 
 			dl.log.Debugf("error copying file to disk: %v", err)
-			atomic.AddInt64(&dl.counter.failed, 1)
-
+			dl.counter.failed.Add(1)
 			continue
 		}
 
-		atomic.AddInt64(&dl.counter.finished, 1)
+		dl.counter.finished.Add(1)
 		dl.log.Debugf("saved file: %v to disk", filename)
 	}
 
@@ -264,11 +249,10 @@ func (dl *downloader) getPostsFromReddit(settings *Settings) (*posts, error) {
 		URL = fmt.Sprintf("%s&after=%s&count=%d", URL, dl.after, settings.Count)
 	}
 
-	request, err := http.NewRequest("GET", URL, http.NoBody)
+	request, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, URL, http.NoBody)
 	if err != nil {
 		return nil, fmt.Errorf("error creating a request: %w, URL: %v", err, URL)
 	}
-
 	request.Header.Add("User-Agent", "go:getter")
 
 	response, err := dl.client.Do(request)
@@ -281,7 +265,7 @@ func (dl *downloader) getPostsFromReddit(settings *Settings) (*posts, error) {
 		return nil, fmt.Errorf("%w: %v", ErrUnexpectedStatus, http.StatusText(response.StatusCode))
 	}
 
-	posts := new(posts)
+	posts := &posts{}
 	if err := json.NewDecoder(response.Body).Decode(posts); err != nil {
 		return nil, fmt.Errorf("error decoding posts: %w", err)
 	}
@@ -290,13 +274,13 @@ func (dl *downloader) getPostsFromReddit(settings *Settings) (*posts, error) {
 }
 
 // Converts posts to content depending on the configuration, leaving only the required types of media in.
-func postsToContent(settings *Settings, cd []child) []content {
-	media := make([]content, 0)
+func postsToContent(settings *Settings, child []child) []Content {
+	media := make([]Content, 0)
 
-	for i := 0; i < len(cd); i++ {
-		value := &cd[i]
+	for i := 0; i < len(child); i++ {
+		value := &child[i]
 		if value.Data.IsVideo && settings.IncludeVideo { // Append video
-			media = append(media, content{
+			media = append(media, Content{
 				Name:    value.Data.Title,
 				URL:     strings.ReplaceAll(value.Data.Media.RedditVideo.ScrubberMediaURL, "&amp;s", "&s"),
 				Width:   value.Data.Media.RedditVideo.Width,
@@ -305,7 +289,7 @@ func postsToContent(settings *Settings, cd []child) []content {
 			})
 		} else { // Append images
 			for _, img := range value.Data.Preview.Images {
-				media = append(media, content{
+				media = append(media, Content{
 					Name:    value.Data.Title,
 					URL:     strings.ReplaceAll(img.Source.URL, "&amp;s", "&s"),
 					Width:   img.Source.Width,
@@ -327,7 +311,7 @@ func (dl *downloader) showProgress(terminate chan int8) {
 			end = true
 		default:
 			dl.log.Infof("Current progress: queued=%d, finished=%d, failed=%d",
-				dl.counter.queued, dl.counter.finished, dl.counter.failed)
+				dl.counter.queued.Load(), dl.counter.finished.Load(), dl.counter.failed.Load())
 			time.Sleep(time.Second)
 		}
 	}
