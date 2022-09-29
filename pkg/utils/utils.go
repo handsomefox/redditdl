@@ -46,15 +46,15 @@ func CreateFilename(name, extension string) (string, error) {
 
 // FileExists returns whether the file exists.
 func FileExists(filename string) bool {
-	fi, err := os.Stat(filename)
+	f, err := os.Stat(filename)
 	if err != nil {
 		return os.IsExist(err)
 	}
 
-	return !fi.IsDir()
+	return !f.IsDir()
 }
 
-const NtfsMaxFilenameLength = 256
+const NTFSMaxFilenameLength = 256
 
 // formatFilename ensures that the filename is valid for NTFS and has the right extension.
 func formatFilename(filename, extension string) (string, error) {
@@ -70,8 +70,8 @@ func formatFilename(filename, extension string) (string, error) {
 	extension = removeForbiddenChars(extension)
 
 	totalLength := len(filename) + len(extension) + 1
-	if totalLength > NtfsMaxFilenameLength {
-		requiredLength := NtfsMaxFilenameLength - len(extension) - 1
+	if totalLength > NTFSMaxFilenameLength {
+		requiredLength := NTFSMaxFilenameLength - len(extension) - 1
 		filename = filename[:requiredLength]
 	}
 
