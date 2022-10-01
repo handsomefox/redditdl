@@ -4,8 +4,8 @@ import (
 	"flag"
 	"os"
 
-	"redditdl/pkg/downloader"
-	"redditdl/pkg/logging"
+	"github.com/handsomefox/redditdl/downloader"
+	"github.com/handsomefox/redditdl/internal/logging"
 )
 
 func main() {

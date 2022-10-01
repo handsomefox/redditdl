@@ -3,8 +3,8 @@ package downloader
 import (
 	"time"
 
-	"redditdl/pkg/logging"
-	"redditdl/pkg/utils"
+	"github.com/handsomefox/redditdl/internal/logging"
+	"github.com/handsomefox/redditdl/internal/utils"
 )
 
 // Settings is the configuration for the Downloader.

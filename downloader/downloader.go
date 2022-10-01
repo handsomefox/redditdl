@@ -13,7 +13,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"redditdl/pkg/utils"
+	"github.com/handsomefox/redditdl/internal/utils"
 
 	"go.uber.org/zap"
 	"golang.org/x/exp/slices"

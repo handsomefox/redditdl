@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"testing"
 
-	"redditdl/pkg/downloader"
+	"github.com/handsomefox/redditdl/downloader"
 )
 
 func TestDownload(t *testing.T) {

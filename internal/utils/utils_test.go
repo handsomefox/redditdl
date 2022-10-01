@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"redditdl/pkg/utils"
+	"github.com/handsomefox/redditdl/internal/utils"
 )
 
 func TestCreateClient(t *testing.T) {

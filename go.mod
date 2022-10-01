@@ -1,4 +1,4 @@
-module redditdl
+module github.com/handsomefox/redditdl
 
 go 1.19
 

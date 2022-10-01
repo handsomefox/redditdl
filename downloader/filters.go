@@ -1,6 +1,6 @@
 package downloader
 
-import "redditdl/pkg/utils"
+import "github.com/handsomefox/redditdl/internal/utils"
 
 func DefaultFilters() []Filter {
 	return []Filter{
