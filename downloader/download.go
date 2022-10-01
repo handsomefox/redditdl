@@ -9,14 +9,16 @@ import (
 
 // Settings is the configuration for the Downloader.
 type Settings struct {
-	Directory    string
-	Subreddit    string
-	Sorting      string
-	Timeframe    string
-	Orientation  string
-	Count        int64
-	MinWidth     int
-	MinHeight    int
+	Directory   string
+	Subreddit   string
+	Sorting     string
+	Timeframe   string
+	Orientation string
+
+	Count     int64
+	MinWidth  int
+	MinHeight int
+
 	Verbose      bool
 	ShowProgress bool
 	IncludeVideo bool

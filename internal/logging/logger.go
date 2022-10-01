@@ -8,28 +8,25 @@ import (
 
 var log *zap.Logger
 
-func GetLogger(isDev bool) *zap.SugaredLogger {
+func GetLogger(development bool) *zap.SugaredLogger {
 	if log != nil {
 		return log.Sugar()
 	}
 
-	var (
-		cfg         zapcore.EncoderConfig
-		level       zapcore.Level
-		encodeTime  = zapcore.RFC3339TimeEncoder
-		encodeLevel = zapcore.CapitalColorLevelEncoder
-	)
+	var cfg zapcore.EncoderConfig
+	var level zapcore.Level
 
-	if isDev {
+	switch development {
+	case true:
 		cfg = zap.NewDevelopmentEncoderConfig()
 		level = zapcore.DebugLevel
-	} else {
+	case false:
 		cfg = zap.NewProductionEncoderConfig()
 		level = zapcore.InfoLevel
 	}
 
-	cfg.EncodeLevel = encodeLevel
-	cfg.EncodeTime = encodeTime
+	cfg.EncodeLevel = zapcore.CapitalColorLevelEncoder
+	cfg.EncodeTime = zapcore.RFC3339TimeEncoder
 
 	log = zap.New(zapcore.NewCore(
 		zapcore.NewConsoleEncoder(cfg),

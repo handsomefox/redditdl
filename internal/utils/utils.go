@@ -16,6 +16,11 @@ const (
 	clientTimeout = time.Minute
 )
 
+var (
+	ErrEmptyFilename  = errors.New("empty filename")
+	ErrEmptyExtension = errors.New("empty extension")
+)
+
 // CreateClient returns a pointer to http.Client configured to work with reddit.
 func CreateClient() *http.Client {
 	return &http.Client{

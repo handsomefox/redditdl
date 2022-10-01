@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -17,6 +18,11 @@ import (
 
 	"go.uber.org/zap"
 	"golang.org/x/exp/slices"
+)
+
+var (
+	ErrSaveGoroutine    = errors.New("error waiting for the saving goroutine to finish")
+	ErrUnexpectedStatus = errors.New("unexpected status in response")
 )
 
 type downloader struct {
