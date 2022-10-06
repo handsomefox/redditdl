@@ -10,7 +10,7 @@ func DefaultFilters() []Filter {
 	}
 }
 
-// Interface that filters the given slice and returns the mutated version of it.
+// Filter is an interface that filters the given slice and returns the mutated version of it.
 type Filter interface {
 	Filter([]Content, *Settings) []Content
 }

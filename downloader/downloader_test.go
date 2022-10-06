@@ -23,7 +23,7 @@ func TestDownload(t *testing.T) {
 		MinHeight:    0,
 		Verbose:      false,
 		ShowProgress: false,
-		IncludeVideo: false,
+		ContentType:  downloader.MediaAny,
 	}
 
 	count, err := downloader.Download(&settings, downloader.DefaultFilters())
@@ -48,7 +48,7 @@ func BenchmarkDownload(b *testing.B) {
 		MinHeight:    1080,
 		Verbose:      false,
 		ShowProgress: false,
-		IncludeVideo: true,
+		ContentType:  downloader.MediaAny,
 	}
 
 	filters := downloader.DefaultFilters()

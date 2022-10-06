@@ -7,6 +7,15 @@ import (
 	"github.com/handsomefox/redditdl/internal/utils"
 )
 
+type MediaType uint8
+
+const (
+	_ MediaType = iota
+	MediaImages
+	MediaVideos
+	MediaAny
+)
+
 // Settings is the configuration for the Downloader.
 type Settings struct {
 	Directory   string
@@ -21,7 +30,8 @@ type Settings struct {
 
 	Verbose      bool
 	ShowProgress bool
-	IncludeVideo bool
+
+	ContentType MediaType
 }
 
 const (
@@ -34,7 +44,6 @@ func Download(settings *Settings, filters []Filter) (int64, error) {
 	dl := downloader{
 		client:  utils.CreateClient(),
 		log:     logging.GetLogger(settings.Verbose),
-		after:   "",
 		counter: counter{},
 	}
 

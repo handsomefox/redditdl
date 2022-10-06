@@ -20,10 +20,7 @@ import (
 	"golang.org/x/exp/slices"
 )
 
-var (
-	ErrSaveGoroutine    = errors.New("error waiting for the saving goroutine to finish")
-	ErrUnexpectedStatus = errors.New("unexpected status in response")
-)
+var ErrUnexpectedStatus = errors.New("unexpected status in response")
 
 type downloader struct {
 	client  *http.Client
@@ -280,29 +277,57 @@ func (dl *downloader) getPostsFromReddit(settings *Settings) (*posts, error) {
 }
 
 // Converts posts to content depending on the configuration, leaving only the required types of media in.
-func postsToContent(settings *Settings, child []child) []Content {
+func postsToContent(settings *Settings, children []child) []Content {
 	media := make([]Content, 0)
 
-	for i := 0; i < len(child); i++ {
-		value := &child[i]
-		if value.Data.IsVideo && settings.IncludeVideo { // Append video
-			media = append(media, Content{
-				Name:    value.Data.Title,
-				URL:     strings.ReplaceAll(value.Data.Media.RedditVideo.ScrubberMediaURL, "&amp;s", "&s"),
-				Width:   value.Data.Media.RedditVideo.Width,
-				Height:  value.Data.Media.RedditVideo.Height,
-				IsVideo: true,
-			})
-		} else { // Append images
-			for _, img := range value.Data.Preview.Images {
-				media = append(media, Content{
-					Name:    value.Data.Title,
-					URL:     strings.ReplaceAll(img.Source.URL, "&amp;s", "&s"),
-					Width:   img.Source.Width,
-					Height:  img.Source.Height,
-					IsVideo: false,
-				})
-			}
+	for i := 0; i < len(children); i++ {
+		media = appendContent(media, &children[i], settings.ContentType)
+	}
+
+	return media
+}
+
+func appendImage(media []Content, data *childData) []Content {
+	for _, img := range data.Preview.Images {
+		media = append(media, Content{
+			Name:    data.Title,
+			URL:     strings.ReplaceAll(img.Source.URL, "&amp;s", "&s"),
+			Width:   img.Source.Width,
+			Height:  img.Source.Height,
+			IsVideo: false,
+		})
+	}
+
+	return media
+}
+
+func appendVideo(media []Content, data *childData) []Content {
+	media = append(media, Content{
+		Name:    data.Title,
+		URL:     strings.ReplaceAll(data.Media.RedditVideo.ScrubberMediaURL, "&amp;s", "&s"),
+		Width:   data.Media.RedditVideo.Width,
+		Height:  data.Media.RedditVideo.Height,
+		IsVideo: true,
+	})
+
+	return media
+}
+
+func appendContent(media []Content, v *child, typ MediaType) []Content {
+	switch typ {
+	case MediaAny:
+		if v.Data.IsVideo {
+			media = appendVideo(media, &v.Data)
+		} else {
+			media = appendImage(media, &v.Data)
+		}
+	case MediaImages:
+		if !v.Data.IsVideo {
+			media = appendImage(media, &v.Data)
+		}
+	case MediaVideos:
+		if v.Data.IsVideo {
+			media = appendVideo(media, &v.Data)
 		}
 	}
 
