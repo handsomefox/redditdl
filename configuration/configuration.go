@@ -1,8 +1,10 @@
+// configuration is a package that has data structures
+// that describe the settings that can be applied to a downloader.
 package configuration
 
 import "time"
 
-// MediaType is the type of media which will be queued for downoad.
+// MediaType is the type of media which will be queued for download.
 type MediaType uint8
 
 const (
