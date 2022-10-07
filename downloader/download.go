@@ -10,7 +10,6 @@ import (
 	"github.com/handsomefox/redditdl/filter"
 	"github.com/handsomefox/redditdl/structs"
 	"github.com/handsomefox/redditdl/utils"
-	"golang.org/x/exp/slices"
 
 	"go.uber.org/zap"
 )
