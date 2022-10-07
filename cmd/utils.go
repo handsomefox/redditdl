@@ -67,7 +67,7 @@ func GetSettings(cmd *cobra.Command) configuration.Data {
 }
 
 func RunCommand(cfg *configuration.Data) {
-	log := logging.GetLogger(cfg.Verbose)
+	log := logging.Get(cfg.Verbose)
 
 	// Print the configuration
 	log.Debugf("Using parameters: %#v", cfg)
