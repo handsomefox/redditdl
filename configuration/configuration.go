@@ -19,8 +19,8 @@ const (
 	DefaultSleepTime   = 200 * time.Millisecond
 )
 
-// Data is the configuration data for the Downloader.
-type Data struct {
+// Config is the configuration data for the Downloader.
+type Config struct {
 	Directory   string
 	Subreddit   string
 	Sorting     string

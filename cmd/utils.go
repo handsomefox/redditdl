@@ -25,7 +25,7 @@ func assert(err error) {
 	}
 }
 
-func GetSettings(cmd *cobra.Command) configuration.Data {
+func GetSettings(cmd *cobra.Command) configuration.Config {
 	flags := cmd.Flags()
 
 	directory, err := flags.GetString("dir")
@@ -49,7 +49,7 @@ func GetSettings(cmd *cobra.Command) configuration.Data {
 	progress, err := flags.GetBool("progress")
 	assert(err)
 
-	return configuration.Data{
+	return configuration.Config{
 		Directory:    directory,
 		Subreddit:    subreddit,
 		Sorting:      sorting,
@@ -66,7 +66,7 @@ func GetSettings(cmd *cobra.Command) configuration.Data {
 	}
 }
 
-func RunCommand(cfg *configuration.Data) {
+func RunCommand(cfg *configuration.Config) {
 	log := logging.Get(cfg.Verbose)
 
 	// Print the configuration

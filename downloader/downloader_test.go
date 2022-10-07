@@ -14,7 +14,7 @@ import (
 func TestDownload(t *testing.T) {
 	t.Parallel()
 
-	cfg := configuration.Data{
+	cfg := configuration.Config{
 		Directory:    os.TempDir(),
 		Subreddit:    "wallpaper",
 		Sorting:      "best",
@@ -44,7 +44,7 @@ func TestDownload(t *testing.T) {
 func BenchmarkDownload(b *testing.B) {
 	b.StopTimer()
 
-	cfg := configuration.Data{
+	cfg := configuration.Config{
 		Directory:    "",
 		Subreddit:    "wallpaper",
 		Sorting:      "best",

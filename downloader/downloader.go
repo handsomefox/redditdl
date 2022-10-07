@@ -23,7 +23,7 @@ type Downloader interface {
 }
 
 // New returns a new Downloader instance with the specified configuration.
-func New(config *configuration.Data, filters ...filter.Filter) Downloader {
+func New(config *configuration.Config, filters ...filter.Filter) Downloader {
 	return &downloader{
 		Config:  config,
 		Logger:  logging.Get(config.Verbose),
@@ -67,7 +67,7 @@ func (s *Stats) HasErrors() bool {
 var _ Downloader = &downloader{}
 
 type downloader struct {
-	Config  *configuration.Data
+	Config  *configuration.Config
 	Logger  *zap.SugaredLogger
 	Stats   *Stats
 	Filters []filter.Filter

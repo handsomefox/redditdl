@@ -21,7 +21,7 @@ func Default() []Filter {
 
 // IsFiltered returns a boolean that indicates whether applying filters to the given item
 // indicate that the item is unwanted.
-func IsFiltered(cfg *configuration.Data, item api.Content, filters ...Filter) bool {
+func IsFiltered(cfg *configuration.Config, item api.Content, filters ...Filter) bool {
 	for _, f := range filters {
 		if filtered := f.Filters(item, cfg); filtered {
 			return true
@@ -33,19 +33,19 @@ func IsFiltered(cfg *configuration.Data, item api.Content, filters ...Filter) bo
 // Filter is an interface that filters the given item and returns the result of filtering (true/false).
 type Filter interface {
 	// Filters returns whether the applied filters say that the item should be filtered out.
-	Filters(api.Content, *configuration.Data) bool
+	Filters(api.Content, *configuration.Config) bool
 }
 
 // FilterFunc implements filter interface and expects the function to return a boolean.
-type FilterFunc func(api.Content, *configuration.Data) bool
+type FilterFunc func(api.Content, *configuration.Config) bool
 
-func (f FilterFunc) Filters(c api.Content, d *configuration.Data) bool {
+func (f FilterFunc) Filters(c api.Content, d *configuration.Config) bool {
 	return f(c, d)
 }
 
 // WidthHeight is a filter that filters images by specified width and height from settings.
 func WidthHeight() FilterFunc {
-	return func(item api.Content, cfg *configuration.Data) bool {
+	return func(item api.Content, cfg *configuration.Config) bool {
 		if item.Width >= cfg.MinWidth && item.Height >= cfg.MinHeight {
 			return false
 		}
@@ -55,7 +55,7 @@ func WidthHeight() FilterFunc {
 
 // URLs is a filter that filters out invalid URLs.
 func URLs() FilterFunc {
-	return func(item api.Content, cfg *configuration.Data) bool {
+	return func(item api.Content, cfg *configuration.Config) bool {
 		if len(item.URL) > 0 && fetch.IsURL(item.URL) {
 			return false
 		}
@@ -65,7 +65,7 @@ func URLs() FilterFunc {
 
 // Orientation is a filter that filters images by specified orientation.
 func Orientation() FilterFunc {
-	return func(item api.Content, cfg *configuration.Data) bool {
+	return func(item api.Content, cfg *configuration.Config) bool {
 		if cfg.Orientation == "" || len(cfg.Orientation) > 1 {
 			return false
 		}
