@@ -9,9 +9,9 @@ type ContentType uint8
 
 const (
 	_ ContentType = iota
-	MediaImages
-	MediaVideos
-	MediaAny
+	ContentImages
+	ContentVideos
+	ContentAny
 )
 
 const (

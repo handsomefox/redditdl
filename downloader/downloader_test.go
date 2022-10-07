@@ -27,7 +27,7 @@ func TestDownload(t *testing.T) {
 		SleepTime:    configuration.DefaultSleepTime,
 		Verbose:      true,
 		ShowProgress: true,
-		ContentType:  configuration.MediaAny,
+		ContentType:  configuration.ContentAny,
 	}
 
 	client := downloader.New(&cfg, filter.Default()...)
@@ -57,7 +57,7 @@ func BenchmarkDownload(b *testing.B) {
 		SleepTime:    configuration.DefaultSleepTime,
 		Verbose:      false,
 		ShowProgress: false,
-		ContentType:  configuration.MediaAny,
+		ContentType:  configuration.ContentAny,
 	}
 
 	client := downloader.New(&cfg, filter.Default()...)

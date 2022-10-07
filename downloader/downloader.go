@@ -232,7 +232,7 @@ func postsToContent(typ configuration.ContentType, children []api.Child) []api.C
 	data := make([]api.Content, 0, len(children))
 	for i := 0; i < len(children); i++ {
 		value := &children[i].Data
-		if !value.IsVideo && typ == configuration.MediaAny || typ == configuration.MediaImages {
+		if !value.IsVideo && typ == configuration.ContentAny || typ == configuration.ContentImages {
 			for _, img := range value.Preview.Images {
 				data = append(data, api.Content{
 					Name:    value.Title,
@@ -242,7 +242,7 @@ func postsToContent(typ configuration.ContentType, children []api.Child) []api.C
 					IsVideo: false,
 				})
 			}
-		} else if value.IsVideo && typ == configuration.MediaAny || typ == configuration.MediaVideos {
+		} else if value.IsVideo && typ == configuration.ContentAny || typ == configuration.ContentVideos {
 			data = append(data, api.Content{
 				Name:    value.Title,
 				URL:     strings.ReplaceAll(value.Media.RedditVideo.ScrubberMediaURL, "&amp;s", "&s"),

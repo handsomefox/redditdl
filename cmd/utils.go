@@ -62,7 +62,7 @@ func GetSettings(cmd *cobra.Command) configuration.Config {
 		SleepTime:    configuration.DefaultSleepTime,
 		Verbose:      verbose,
 		ShowProgress: progress,
-		ContentType:  configuration.MediaAny,
+		ContentType:  configuration.ContentAny,
 	}
 }
 
@@ -87,11 +87,11 @@ func RunCommand(cfg *configuration.Config) {
 
 	fStr := "Finished downloading %d "
 	switch cfg.ContentType {
-	case configuration.MediaAny:
+	case configuration.ContentAny:
 		fStr += "image(s)/video(s)"
-	case configuration.MediaImages:
+	case configuration.ContentImages:
 		fStr += "image(s)"
-	case configuration.MediaVideos:
+	case configuration.ContentVideos:
 		fStr += "video(s)"
 	}
 

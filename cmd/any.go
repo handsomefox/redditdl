@@ -15,7 +15,7 @@ filters to the content which will be downloaded.
 `,
 	Run: func(cmd *cobra.Command, args []string) {
 		settings := GetSettings(cmd)
-		settings.ContentType = configuration.MediaAny
+		settings.ContentType = configuration.ContentAny
 		RunCommand(&settings)
 	},
 }
