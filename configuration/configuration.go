@@ -14,7 +14,7 @@ const (
 
 const (
 	DefaultWorkerCount = 16
-	DefaultSleepTime   = 5 * time.Second
+	DefaultSleepTime   = 200 * time.Millisecond
 )
 
 // Data is the configuration data for the Downloader.
