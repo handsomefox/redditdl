@@ -57,7 +57,7 @@ func FileExists(filename string) bool {
 	return !f.IsDir()
 }
 
-const NTFSMaxFilenameLength = 256
+const MaxFilenameLength = 200
 
 // formatFilename ensures that the filename is valid for NTFS and has the right extension.
 func formatFilename(filename, extension string) (string, error) {
@@ -73,8 +73,8 @@ func formatFilename(filename, extension string) (string, error) {
 	extension = removeForbiddenChars(extension)
 
 	totalLength := len(filename) + len(extension) + 1
-	if totalLength > NTFSMaxFilenameLength {
-		requiredLength := NTFSMaxFilenameLength - len(extension) - 1
+	if totalLength > MaxFilenameLength {
+		requiredLength := MaxFilenameLength - len(extension) - 1
 		filename = filename[:requiredLength]
 	}
 
@@ -84,7 +84,7 @@ func formatFilename(filename, extension string) (string, error) {
 // removeForbiddenChars removes invalid characters for Linux/Windows filenames.
 func removeForbiddenChars(name string) string {
 	var (
-		forbiddenChars = []string{"/", "<", ">", ":", "\"", "\\", "|", "?", "*"}
+		forbiddenChars = []string{"/", "<", ">", ":", "\"", "\\", "|", "?", "*", "(", ")"}
 		result         = name
 	)
 
