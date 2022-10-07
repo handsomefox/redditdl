@@ -1,20 +1,12 @@
-package utils_test
+package files_test
 
 import (
 	"os"
 	"path/filepath"
 	"testing"
 
-	"github.com/handsomefox/redditdl/utils"
+	"github.com/handsomefox/redditdl/files"
 )
-
-func TestCreateClient(t *testing.T) {
-	t.Parallel()
-
-	if client := utils.CreateClient(); client == nil {
-		t.Error("Failed to create client") // this will never happen
-	}
-}
 
 func TestCreateFilename(t *testing.T) {
 	t.Parallel()
@@ -29,32 +21,9 @@ func TestCreateFilename(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		got, _ := utils.CreateFilename(test.name, test.extension)
+		got, _ := files.NewFilename(test.name, test.extension)
 		if got != test.want {
 			t.Errorf("CreateFilename(%#v) unexpected result, got: %v, want: %v", test, got, test.want)
-		}
-	}
-}
-
-func TestIsURL(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		url  string
-		want bool
-	}{
-		{"google.com", false},
-		{"google", false},
-		{"www.google", false},
-		{"http://google.com", true},
-		{"https://google.com", true},
-		{"http://", false},
-	}
-
-	for _, test := range tests {
-		got := utils.IsURL(test.url)
-		if got != test.want {
-			t.Errorf("TestIsURL(%#v) unexpected result, got: %v, want: %v", test, got, test.want)
 		}
 	}
 }
@@ -73,7 +42,7 @@ func TestNavigateToDirectory(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		err := utils.NavigateToDirectory(test.dir, test.create)
+		err := files.NavigateTo(test.dir, test.create)
 
 		if test.shouldError && err == nil {
 			t.Errorf("NavigateToDirectory(%#v) unexpected result, got: %v, want: %#v", test, err, test.shouldError)
@@ -96,7 +65,7 @@ func TestFileExists(t *testing.T) {
 		{"anotherrandomfilename.exe", true, true},
 	}
 
-	_ = utils.NavigateToDirectory(os.TempDir(), false)
+	_ = files.NavigateTo(os.TempDir(), false)
 
 	for index, test := range tests {
 		if !test.create {
@@ -117,7 +86,7 @@ func TestFileExists(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		if got := utils.FileExists(test.name); got != test.want {
+		if got := files.Exists(test.name); got != test.want {
 			t.Errorf("FileExists(%#v) unexpected output, want %v, got %v", test, test.want, got)
 		}
 	}

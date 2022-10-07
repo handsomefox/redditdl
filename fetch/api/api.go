@@ -1,10 +1,5 @@
-package structs
-
-// Files is the structure that is saved to disk later.
-type File struct {
-	Name, Extension string
-	Data            []byte
-}
+// api is a package containing data structures that mimic reddit.com responses.
+package api
 
 // Content contains information which is required to filter by resolution,
 // Content and store a video or an image.

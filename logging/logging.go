@@ -1,3 +1,5 @@
+// logging is a wrapper around uber/zap logger
+// to quickly get a configured logger.
 package logging
 
 import (
@@ -8,7 +10,8 @@ import (
 
 var log *zap.Logger
 
-func GetLogger(development bool) *zap.SugaredLogger {
+// Get returns a new logger configured depending on the development bool.
+func Get(development bool) *zap.SugaredLogger {
 	if log != nil {
 		return log.Sugar()
 	}

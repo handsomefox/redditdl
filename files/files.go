@@ -1,44 +1,40 @@
-package utils
+// files is a package with utility-like file functions used in redditdl
+package files
 
 import (
 	"bytes"
-	"crypto/tls"
 	"errors"
 	"fmt"
-	"net/http"
-	"net/url"
 	"os"
 	"strconv"
 	"strings"
-	"time"
-
-	"github.com/handsomefox/redditdl/structs"
 )
 
-const (
-	clientTimeout = time.Minute
-)
+// File is the structure that is saved to disk later.
+type File struct {
+	Name, Extension string
+	Data            []byte
+}
 
-// CreateClient returns a pointer to http.Client configured to work with reddit.
-func CreateClient() *http.Client {
-	return &http.Client{
-		Transport: &http.Transport{
-			TLSNextProto: map[string]func(authority string, c *tls.Conn) http.RoundTripper{},
-		},
-		Timeout: clientTimeout,
+// New return a pointer to a new File.
+func New(name, ext string, data []byte) *File {
+	return &File{
+		Name:      name,
+		Extension: ext,
+		Data:      data,
 	}
 }
 
-// CreateFilename generates a valid filename for the media.
-func CreateFilename(name, extension string) (string, error) {
-	formatted, err := formatFilename(name, extension)
+// NewFilename generates a valid filename for the media.
+func NewFilename(name, extension string) (string, error) {
+	formatted, err := format(name, extension)
 	if err != nil {
 		return "", fmt.Errorf("error creating filename (%v): %w", name, err)
 	}
 
 	// Resolve duplicates
-	for i := 0; FileExists(formatted); i++ {
-		formatted, err = formatFilename("("+strconv.Itoa(i)+") "+name, extension)
+	for i := 0; Exists(formatted); i++ {
+		formatted, err = format("("+strconv.Itoa(i)+") "+name, extension)
 		if err != nil {
 			return "", fmt.Errorf("error creating filename (%v): %w", name, err)
 		}
@@ -47,8 +43,8 @@ func CreateFilename(name, extension string) (string, error) {
 	return formatted, nil
 }
 
-// FileExists returns whether the file exists.
-func FileExists(filename string) bool {
+// Exists returns whether the file exists.
+func Exists(filename string) bool {
 	f, err := os.Stat(filename)
 	if err != nil {
 		return os.IsExist(err)
@@ -59,8 +55,8 @@ func FileExists(filename string) bool {
 
 const MaxFilenameLength = 200
 
-// formatFilename ensures that the filename is valid for NTFS and has the right extension.
-func formatFilename(filename, extension string) (string, error) {
+// format ensures that the filename is valid for NTFS and has the right extension.
+func format(filename, extension string) (string, error) {
 	if filename == "" {
 		return "", fmt.Errorf("empty filename provided")
 	}
@@ -95,15 +91,8 @@ func removeForbiddenChars(name string) string {
 	return result
 }
 
-// IsURL checks if the URL is valid.
-func IsURL(str string) bool {
-	u, err := url.ParseRequestURI(str)
-
-	return err == nil && u.Host != "" && u.Scheme != ""
-}
-
-// NavigateToDirectory moves to the provided directory and creates it if necessary.
-func NavigateToDirectory(dir string, createDir bool) error {
+// NavigateTo moves to the provided directory and creates it if necessary.
+func NavigateTo(dir string, createDir bool) error {
 	if createDir {
 		if err := os.Mkdir(dir, os.ModePerm); err != nil {
 			if !errors.Is(err, os.ErrExist) {
@@ -119,7 +108,8 @@ func NavigateToDirectory(dir string, createDir bool) error {
 	return nil
 }
 
-func SaveFile(filename string, file *structs.File) error {
+// Save saves the file to the provided path/filename.
+func Save(filename string, file *File) error {
 	f, err := os.Create(filename)
 	if err != nil {
 		return fmt.Errorf("error creating a file: %w", err)
@@ -131,7 +121,7 @@ func SaveFile(filename string, file *structs.File) error {
 			return fmt.Errorf("error removing a file: %w", err)
 		}
 
-		return fmt.Errorf("erorr writing to a file: %w", err)
+		return fmt.Errorf("error writing to a file: %w", err)
 	}
 
 	return nil

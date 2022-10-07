@@ -1,19 +1,45 @@
+// fetch is a package for fetching posts from reddit.com
+// and some utility-like functions.
 package fetch
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
+	"time"
 
 	"github.com/handsomefox/redditdl/configuration"
-	"github.com/handsomefox/redditdl/structs"
-	"github.com/handsomefox/redditdl/utils"
+	"github.com/handsomefox/redditdl/fetch/api"
+	"github.com/handsomefox/redditdl/files"
 )
 
-// FormatURL formats the URL using the configration.
+const (
+	clientTimeout = time.Minute
+)
+
+// NewClient returns a pointer to http.Client configured to work with reddit.
+func NewClient() *http.Client {
+	return &http.Client{
+		Transport: &http.Transport{
+			TLSNextProto: map[string]func(authority string, c *tls.Conn) http.RoundTripper{},
+		},
+		Timeout: clientTimeout,
+	}
+}
+
+// IsURL checks if the URL is valid.
+func IsURL(str string) bool {
+	u, err := url.ParseRequestURI(str)
+
+	return err == nil && u.Host != "" && u.Scheme != ""
+}
+
+// FormatURL formats the URL using the configuration.
 func FormatURL(cfg *configuration.Data, after string) string {
 	URL := fmt.Sprintf("https://www.reddit.com/r/%s/%s.json?limit=%d&t=%s",
 		cfg.Subreddit, cfg.Sorting, cfg.Count, cfg.Timeframe)
@@ -25,8 +51,8 @@ func FormatURL(cfg *configuration.Data, after string) string {
 	return URL
 }
 
-func File(content *structs.Content) (*structs.File, error) {
-	client := utils.CreateClient()
+func File(content *api.Content) (*files.File, error) {
+	client := NewClient()
 
 	request, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, content.URL, http.NoBody)
 	if err != nil {
@@ -63,19 +89,15 @@ func File(content *structs.Content) (*structs.File, error) {
 		return nil, fmt.Errorf("error reading response body: %w", err)
 	}
 
-	return &structs.File{
-		Data:      b,
-		Name:      content.Name,
-		Extension: extension,
-	}, nil
+	return files.New(content.Name, extension, b), nil
 }
 
 // Posts fetches a json file from reddit containing information
 // about the posts using the given configuration.
-func Posts(url string) (*structs.Posts, error) {
-	client := utils.CreateClient()
+func Posts(path string) (*api.Posts, error) {
+	client := NewClient()
 
-	request, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, url, http.NoBody)
+	request, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, path, http.NoBody)
 	if err != nil {
 		return nil, fmt.Errorf("error creating a request: %w", err)
 	}
@@ -91,7 +113,7 @@ func Posts(url string) (*structs.Posts, error) {
 		return nil, fmt.Errorf("%s: %v", "unexpected status in response", http.StatusText(response.StatusCode))
 	}
 
-	posts := &structs.Posts{}
+	posts := &api.Posts{}
 	if err := json.NewDecoder(response.Body).Decode(posts); err != nil {
 		return nil, fmt.Errorf("error decoding posts: %w", err)
 	}
