@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"bytes"
 	"crypto/tls"
 	"errors"
 	"fmt"
@@ -10,15 +11,12 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/handsomefox/redditdl/structs"
 )
 
 const (
 	clientTimeout = time.Minute
-)
-
-var (
-	ErrEmptyFilename  = errors.New("empty filename")
-	ErrEmptyExtension = errors.New("empty extension")
 )
 
 // CreateClient returns a pointer to http.Client configured to work with reddit.
@@ -64,11 +62,11 @@ const NTFSMaxFilenameLength = 256
 // formatFilename ensures that the filename is valid for NTFS and has the right extension.
 func formatFilename(filename, extension string) (string, error) {
 	if filename == "" {
-		return "", ErrEmptyFilename
+		return "", fmt.Errorf("empty filename provided")
 	}
 
 	if extension == "" {
-		return "", ErrEmptyExtension
+		return "", fmt.Errorf("empty extension provided")
 	}
 
 	filename = removeForbiddenChars(filename)
@@ -116,6 +114,24 @@ func NavigateToDirectory(dir string, createDir bool) error {
 
 	if err := os.Chdir(dir); err != nil {
 		return fmt.Errorf("error navigating to directory, %w", err)
+	}
+
+	return nil
+}
+
+func SaveFile(filename string, file *structs.File) error {
+	f, err := os.Create(filename)
+	if err != nil {
+		return fmt.Errorf("error creating a file: %w", err)
+	}
+
+	r := bytes.NewReader(file.Data)
+	if _, err := r.WriteTo(f); err != nil {
+		if err := os.Remove(filename); err != nil {
+			return fmt.Errorf("error removing a file: %w", err)
+		}
+
+		return fmt.Errorf("erorr writing to a file: %w", err)
 	}
 
 	return nil
