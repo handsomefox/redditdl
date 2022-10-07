@@ -38,6 +38,8 @@ func File(content *structs.Content) (*structs.File, error) {
 		return nil, fmt.Errorf("error making a request: %w", err)
 	}
 
+	defer response.Body.Close()
+
 	if response.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("invalid status code in response: %v", http.StatusText(response.StatusCode))
 	}
@@ -60,8 +62,6 @@ func File(content *structs.Content) (*structs.File, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error reading response body: %w", err)
 	}
-
-	response.Body.Close()
 
 	return &structs.File{
 		Data:      b,
