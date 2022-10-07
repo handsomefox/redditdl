@@ -190,10 +190,10 @@ func (dl *downloader) SaveFiles(filesChan chan structs.File) {
 			dl.Stats.appendIncr(newDownloadError(err, filename))
 
 			continue
-		} else {
-			dl.Stats.Finished.Add(1)
-			dl.Logger.Debugf("saved file: %v to disk", file.Name)
 		}
+
+		dl.Stats.Finished.Add(1)
+		dl.Logger.Debugf("saved file: %v to disk", file.Name)
 	}
 }
 
