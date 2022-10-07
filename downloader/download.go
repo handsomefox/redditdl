@@ -74,7 +74,6 @@ func (dl *downloader) Download() *Stats {
 // FetchPosts is fetching, filtering and sending posts to outChan.
 func (dl *downloader) FetchPosts(outChan chan structs.Content) {
 	var (
-		data  = make([]structs.Content, 0, dl.Config.Count)
 		count int64
 		after string
 	)
@@ -90,17 +89,16 @@ func (dl *downloader) FetchPosts(outChan chan structs.Content) {
 			continue
 		}
 
-		contentChan := make(chan structs.Content)
-
 		dl.Logger.Debug("converting posts")
-		go func() {
-			defer close(contentChan)
-			postsToContent(contentChan, dl.Config.ContentType, posts.Data.Children)
-		}()
+		content := postsToContent(dl.Config.ContentType, posts.Data.Children)
 
 		dl.Logger.Debug("filtering posts")
-		for c := range contentChan {
-			if slices.Contains(data, c) || isFiltered(dl.Config, c, dl.Filters...) {
+		for _, c := range content {
+			if count == dl.Config.Count {
+				break
+			}
+
+			if isFiltered(dl.Config, c, dl.Filters...) {
 				continue
 			}
 
