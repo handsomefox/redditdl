@@ -1,11 +1,16 @@
+// filter is a package that is used to implement functions
+// that act upon reddit's content and can filter out
+// things that user does not need to download
+// depending on content parameters (like resolution)
 package filter
 
 import (
 	"github.com/handsomefox/redditdl/configuration"
-	"github.com/handsomefox/redditdl/structs"
-	"github.com/handsomefox/redditdl/utils"
+	"github.com/handsomefox/redditdl/fetch"
+	"github.com/handsomefox/redditdl/fetch/api"
 )
 
+// Default returns a slice of the filters included in this package.
 func Default() []Filter {
 	return []Filter{
 		WidthHeight(),
@@ -14,22 +19,34 @@ func Default() []Filter {
 	}
 }
 
+// IsFiltered returns a boolean that indicates whether applying filters to the given item
+// indicate that the item is unwanted.
+func IsFiltered(cfg *configuration.Data, item api.Content, filters ...Filter) bool {
+	for _, f := range filters {
+		if filtered := f.Filters(item, cfg); filtered {
+			return true
+		}
+	}
+
+	return false
+}
+
 // Filter is an interface that filters the given item and returns the result of filtering (true/false).
 type Filter interface {
 	// Filters returns whether the applied filters say that the item should be filtered out.
-	Filters(structs.Content, *configuration.Data) bool
+	Filters(api.Content, *configuration.Data) bool
 }
 
 // FilterFunc implements filter interface and expects the function to return a boolean.
-type FilterFunc func(structs.Content, *configuration.Data) bool
+type FilterFunc func(api.Content, *configuration.Data) bool
 
-func (f FilterFunc) Filters(c structs.Content, d *configuration.Data) bool {
+func (f FilterFunc) Filters(c api.Content, d *configuration.Data) bool {
 	return f(c, d)
 }
 
-// WidthHeight filters images by specified width and height from settings.
+// WidthHeight is a filter that filters images by specified width and height from settings.
 func WidthHeight() FilterFunc {
-	return func(item structs.Content, cfg *configuration.Data) bool {
+	return func(item api.Content, cfg *configuration.Data) bool {
 		if item.Width >= cfg.MinWidth && item.Height >= cfg.MinHeight {
 			return false
 		}
@@ -38,10 +55,10 @@ func WidthHeight() FilterFunc {
 	}
 }
 
-// URLs filters out invalid URLs.
+// URLs is a filter that filters out invalid URLs.
 func URLs() FilterFunc {
-	return func(item structs.Content, cfg *configuration.Data) bool {
-		if len(item.URL) > 0 && utils.IsURL(item.URL) {
+	return func(item api.Content, cfg *configuration.Data) bool {
+		if len(item.URL) > 0 && fetch.IsURL(item.URL) {
 			return false
 		}
 
@@ -49,9 +66,9 @@ func URLs() FilterFunc {
 	}
 }
 
-// Orientation filters images by specified orientation.
+// Orientation is a filter that filters images by specified orientation.
 func Orientation() FilterFunc {
-	return func(item structs.Content, cfg *configuration.Data) bool {
+	return func(item api.Content, cfg *configuration.Data) bool {
 		if cfg.Orientation == "" || len(cfg.Orientation) > 1 {
 			return false
 		}
