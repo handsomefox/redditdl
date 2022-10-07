@@ -8,14 +8,9 @@ import (
 )
 
 // Converts posts to content depending on the configuration, leaving only the required types of media in.
-func postsToContent(terminate chan uint8, out chan structs.Content, typ configuration.MediaType, c []structs.Child) {
+func postsToContent(out chan structs.Content, typ configuration.MediaType, c []structs.Child) {
 	for i := 0; i < len(c); i++ {
-		select {
-		case <-terminate:
-			return
-		default:
-			makeContent(out, &c[i], typ)
-		}
+		makeContent(out, &c[i], typ)
 	}
 }
 

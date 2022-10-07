@@ -90,26 +90,16 @@ func (dl *downloader) FetchPosts(outChan chan structs.Content) {
 			continue
 		}
 
-		var (
-			contentChan = make(chan structs.Content)
-			closeChan   = make(chan uint8)
-		)
+		contentChan := make(chan structs.Content)
 
 		dl.Logger.Debug("converting posts")
 		go func() {
 			defer close(contentChan)
-			defer close(closeChan)
-			postsToContent(closeChan, contentChan, dl.Config.ContentType, posts.Data.Children)
+			postsToContent(contentChan, dl.Config.ContentType, posts.Data.Children)
 		}()
 
 		dl.Logger.Debug("filtering posts")
 		for c := range contentChan {
-			if count == dl.Config.Count {
-				closeChan <- 1
-
-				break
-			}
-
 			if slices.Contains(data, c) || isFiltered(dl.Config, c, dl.Filters...) {
 				continue
 			}
