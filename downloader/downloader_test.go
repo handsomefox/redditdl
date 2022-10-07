@@ -6,38 +6,46 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/handsomefox/redditdl/configuration"
 	"github.com/handsomefox/redditdl/downloader"
+	"github.com/handsomefox/redditdl/filter"
 )
 
 func TestDownload(t *testing.T) {
 	t.Parallel()
 
-	settings := downloader.Settings{
+	cfg := configuration.Data{
 		Directory:    os.TempDir(),
 		Subreddit:    "wallpaper",
 		Sorting:      "best",
 		Timeframe:    "all",
 		Orientation:  "",
-		Count:        5,
+		Count:        25,
 		MinWidth:     0,
 		MinHeight:    0,
-		Verbose:      false,
-		ShowProgress: false,
-		ContentType:  downloader.MediaAny,
+		WorkerCount:  configuration.DefaultWorkerCount,
+		SleepTime:    configuration.DefaultSleepTime,
+		Verbose:      true,
+		ShowProgress: true,
+		ContentType:  configuration.MediaAny,
 	}
 
-	count, err := downloader.Download(&settings, downloader.DefaultFilters())
-	if err != nil {
-		t.Fatalf("Download(%#v) error: %v", settings, err)
+	client := downloader.New(&cfg, filter.Default()...)
+	stats := client.Download()
+
+	if len(stats.Errors) != 0 {
+		t.Fatalf("Download(%#v) errors: %v", cfg, stats.Errors)
 	}
 
-	if count != settings.Count {
-		t.Fatalf("Download(%#v) loaded %v media, expected %v", settings, count, settings.Count)
+	if stats.Finished.Load() != cfg.Count {
+		t.Fatalf("Download(%#v) loaded %v media, expected %v", cfg, stats.Finished.Load(), cfg.Count)
 	}
 }
 
 func BenchmarkDownload(b *testing.B) {
-	settings := downloader.Settings{
+	b.StopTimer()
+
+	cfg := configuration.Data{
 		Directory:    "",
 		Subreddit:    "wallpaper",
 		Sorting:      "best",
@@ -46,17 +54,22 @@ func BenchmarkDownload(b *testing.B) {
 		Count:        35,
 		MinWidth:     1920,
 		MinHeight:    1080,
+		WorkerCount:  configuration.DefaultWorkerCount,
+		SleepTime:    configuration.DefaultSleepTime,
 		Verbose:      false,
 		ShowProgress: false,
-		ContentType:  downloader.MediaAny,
+		ContentType:  configuration.MediaAny,
 	}
 
-	filters := downloader.DefaultFilters()
+	client := downloader.New(&cfg, filter.Default()...)
 
+	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		settings.Directory = path.Join(os.TempDir(), strconv.Itoa(i))
-		if _, err := downloader.Download(&settings, filters); err != nil {
-			b.Error(err)
+		cfg.Directory = path.Join(os.TempDir(), strconv.Itoa(i))
+		if stats := client.Download(); len(stats.Errors) != 0 {
+			for _, err := range stats.Errors {
+				b.Error(err)
+			}
 		}
 	}
 }
