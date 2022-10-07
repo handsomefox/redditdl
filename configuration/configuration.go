@@ -4,11 +4,11 @@ package configuration
 
 import "time"
 
-// MediaType is the type of media which will be queued for download.
-type MediaType uint8
+// ContentType is the type of media which will be queued for download.
+type ContentType uint8
 
 const (
-	_ MediaType = iota
+	_ ContentType = iota
 	MediaImages
 	MediaVideos
 	MediaAny
@@ -37,5 +37,5 @@ type Config struct {
 	Verbose      bool
 	ShowProgress bool
 
-	ContentType MediaType
+	ContentType ContentType
 }

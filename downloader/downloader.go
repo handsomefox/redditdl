@@ -228,7 +228,7 @@ func (dl *downloader) ShowProgress(exit <-chan bool) {
 }
 
 // Converts posts to content depending on the configuration, leaving only the required types of media in.
-func postsToContent(typ configuration.MediaType, children []api.Child) []api.Content {
+func postsToContent(typ configuration.ContentType, children []api.Child) []api.Content {
 	data := make([]api.Content, 0, len(children))
 	for i := 0; i < len(children); i++ {
 		value := &children[i].Data
