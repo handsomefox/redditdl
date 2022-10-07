@@ -15,7 +15,7 @@ type File struct {
 	Data            []byte
 }
 
-// New return a pointer to a new File.
+// New returns a pointer to a new File.
 func New(name, ext string, data []byte) *File {
 	return &File{
 		Name:      name,
