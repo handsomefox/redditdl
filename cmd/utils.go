@@ -79,7 +79,10 @@ func RunCommand(cfg *configuration.Data) {
 	stats := client.Download()
 
 	if stats.HasErrors() {
-		log.Errorf("error downloading content: %v", stats.Errors)
+		log.Info("Encountered errors during download")
+		for _, err := range stats.Errors {
+			log.Errorf("%v", err)
+		}
 	}
 
 	finishedStr := "Finished downloading %d "
