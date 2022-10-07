@@ -15,7 +15,7 @@ type DownloadError struct {
 	filename string
 }
 
-// FetchError is an errowr which contains data about errors that occurred when fetching data from some url.
+// FetchError is an error which contains data about errors that occurred when fetching data from some url.
 type FetchError struct {
 	err error
 	url string
@@ -27,4 +27,20 @@ func (e DownloadError) Error() string {
 
 func (e FetchError) Error() string {
 	return fmt.Errorf("fetching file from %v failed: %w", e.url, e.err).Error()
+}
+
+// newDownloadError is a handy thing to create errors faster.
+func newDownloadError(err error, filename string) *DownloadError {
+	return &DownloadError{
+		err:      err,
+		filename: filename,
+	}
+}
+
+// newFetchError is a handy thing to create errors faster.
+func newFetchError(err error, url string) *FetchError {
+	return &FetchError{
+		err: err,
+		url: url,
+	}
 }
