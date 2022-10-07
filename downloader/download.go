@@ -159,6 +159,8 @@ func (dl *downloader) DownloadFiles(outChan chan structs.File, inChan chan struc
 		file, err := fetch.File(&content)
 		if err != nil {
 			dl.Stats.append(newFetchError(err, content.URL))
+
+			continue
 		}
 
 		outChan <- *file
