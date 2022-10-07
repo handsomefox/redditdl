@@ -25,5 +25,5 @@ func Execute() {
 
 func init() {
 	rootCmd.PersistentFlags().BoolP("verbose", "v", false, "Turns the logging on or off")
-	rootCmd.PersistentFlags().BoolP("progress", "p", false, "Indicates whether the application will show the download progress")
+	rootCmd.PersistentFlags().BoolP("progress", "p", false, "Indicates if application should show download progress")
 }

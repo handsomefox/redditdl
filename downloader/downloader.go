@@ -63,7 +63,6 @@ func (s *Stats) HasErrors() bool {
 	return len(s.Errors) != 0
 }
 
-// this ensures that the downloader implements the Downloader interface.
 var _ Downloader = &downloader{}
 
 type downloader struct {

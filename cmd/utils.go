@@ -14,9 +14,9 @@ func SetCommonFlags(cmd *cobra.Command) {
 	cmd.Flags().Int64P("count", "c", 1, "Amount of content to download")
 	cmd.Flags().StringP("sub", "r", "wallpaper", "Name of the subreddit")
 	cmd.Flags().StringP("sort", "s", "top", "Sort options(controversial, best, hot, new, random, rising, top)")
-	cmd.Flags().StringP("timeframe", "t", "all", "Timeframe from which to get the posts (hour, day, week, month, year, all)")
+	cmd.Flags().StringP("timeframe", "t", "all", "Timeframe for the posts (hour, day, week, month, year, all)")
 	cmd.Flags().StringP("dir", "d", "media", "Download directory")
-	cmd.Flags().StringP("orientation", "o", "", "Content orientation (\"l\" for landscape, \"p\" for portrait, other for any)")
+	cmd.Flags().StringP("orientation", "o", "", "Content orientation (\"l\"=landscape, \"p\"=portrait, other for any)")
 }
 
 func assert(err error) {
