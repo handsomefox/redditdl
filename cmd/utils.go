@@ -85,16 +85,15 @@ func RunCommand(cfg *configuration.Data) {
 		}
 	}
 
-	finishedStr := "Finished downloading %d "
-
+	fStr := "Finished downloading %d "
 	switch cfg.ContentType {
 	case configuration.MediaAny:
-		finishedStr += "image(s)/video(s)"
+		fStr += "image(s)/video(s)"
 	case configuration.MediaImages:
-		finishedStr += "image(s)"
+		fStr += "image(s)"
 	case configuration.MediaVideos:
-		finishedStr += "video(s)"
+		fStr += "video(s)"
 	}
 
-	log.Infof(finishedStr, stats.Finished.Load())
+	log.Infof(fStr, stats.Finished.Load())
 }

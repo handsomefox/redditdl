@@ -35,19 +35,17 @@ func NewClient() *http.Client {
 // IsURL checks if the URL is valid.
 func IsURL(str string) bool {
 	u, err := url.ParseRequestURI(str)
-
 	return err == nil && u.Host != "" && u.Scheme != ""
 }
 
+const fStr = "https://www.reddit.com/r/%s/%s.json?limit=%d&t=%s"
+
 // FormatURL formats the URL using the configuration.
 func FormatURL(cfg *configuration.Data, after string) string {
-	URL := fmt.Sprintf("https://www.reddit.com/r/%s/%s.json?limit=%d&t=%s",
-		cfg.Subreddit, cfg.Sorting, cfg.Count, cfg.Timeframe)
-
+	URL := fmt.Sprintf(fStr, cfg.Subreddit, cfg.Sorting, cfg.Count, cfg.Timeframe)
 	if len(after) > 0 {
 		URL = fmt.Sprintf("%s&after=%s&count=%d", URL, after, cfg.Count)
 	}
-
 	return URL
 }
 
@@ -63,7 +61,6 @@ func File(content *api.Content) (*files.File, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error making a request: %w", err)
 	}
-
 	defer response.Body.Close()
 
 	if response.StatusCode != http.StatusOK {
@@ -76,7 +73,6 @@ func File(content *api.Content) (*files.File, error) {
 	} else {
 		extension = "jpg" // if we didn't manage to figure out the image extension, assume jpg
 	}
-
 	// the URL path is usually equal to something like "randomid.extension",
 	// this way we can get the actual file extension
 	split := strings.Split(response.Request.URL.Path, ".")

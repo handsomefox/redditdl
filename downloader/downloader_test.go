@@ -36,7 +36,6 @@ func TestDownload(t *testing.T) {
 	if len(stats.Errors) != 0 {
 		t.Fatalf("Download(%#v) errors: %v", cfg, stats.Errors)
 	}
-
 	if stats.Finished.Load() != cfg.Count {
 		t.Fatalf("Download(%#v) loaded %v media, expected %v", cfg, stats.Finished.Load(), cfg.Count)
 	}
@@ -62,7 +61,6 @@ func BenchmarkDownload(b *testing.B) {
 	}
 
 	client := downloader.New(&cfg, filter.Default()...)
-
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		cfg.Directory = path.Join(os.TempDir(), strconv.Itoa(i))

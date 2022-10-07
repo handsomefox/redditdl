@@ -36,12 +36,11 @@ func New(config *configuration.Data, filters ...filter.Filter) Downloader {
 // It may or may not be extended with additional data later.
 type Stats struct {
 	Errors []error
+	mu     sync.Mutex
 
 	Queued   atomic.Int64
 	Finished atomic.Int64
 	Failed   atomic.Int64
-
-	mu sync.Mutex
 }
 
 // append is used to append errors to Stats.
@@ -61,7 +60,6 @@ func (s *Stats) appendIncr(err error) {
 func (s *Stats) HasErrors() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
 	return len(s.Errors) != 0
 }
 
@@ -83,7 +81,6 @@ func (dl *downloader) Download() *Stats {
 		filesChan   = make(chan files.File)
 		wg          sync.WaitGroup
 	)
-
 	// Fetching posts to the content channel for further download.
 	wg.Add(1)
 	go func(out chan api.Content) {
@@ -91,7 +88,6 @@ func (dl *downloader) Download() *Stats {
 		defer close(out)
 		dl.FetchPosts(out)
 	}(contentChan)
-
 	// Downloading posts from the content channel and storing data in files channel.
 	wg.Add(1)
 	go func(out chan files.File, in chan api.Content) {
@@ -99,7 +95,6 @@ func (dl *downloader) Download() *Stats {
 		defer close(out)
 		dl.DownloadRoutine(filesChan, contentChan)
 	}(filesChan, contentChan)
-
 	// Saving data from files channel to disk.
 	wg.Add(1)
 	go func(in chan files.File) {
@@ -117,9 +112,7 @@ func (dl *downloader) Download() *Stats {
 	if dl.Config.ShowProgress {
 		exitChan <- true
 	}
-
 	close(exitChan)
-
 	return dl.Stats
 }
 
@@ -129,7 +122,6 @@ func (dl *downloader) FetchPosts(out chan api.Content) {
 		count int64
 		after string
 	)
-
 	for count < dl.Config.Count {
 		url := fetch.FormatURL(dl.Config, after)
 		dl.Logger.Debugf("fetching posts from: %v", url)
@@ -137,7 +129,6 @@ func (dl *downloader) FetchPosts(out chan api.Content) {
 		posts, err := fetch.Posts(url)
 		if err != nil {
 			dl.Stats.append(newFetchError(err, url))
-
 			continue
 		}
 
@@ -149,24 +140,19 @@ func (dl *downloader) FetchPosts(out chan api.Content) {
 			if count == dl.Config.Count {
 				break
 			}
-
 			if filter.IsFiltered(dl.Config, c, dl.Filters...) {
 				continue
 			}
-
 			dl.Stats.Queued.Add(1)
 			count++
 			out <- c
 		}
-
 		// another check prevents us from going to sleep for SleepTime if we have enough links.
 		if count == dl.Config.Count {
 			break
 		}
-
 		if len(posts.Data.Children) == 0 || posts.Data.After == after || posts.Data.After == "" {
 			dl.Logger.Info("no more posts to fetch (or rate limited)")
-
 			break
 		}
 
@@ -180,7 +166,6 @@ func (dl *downloader) FetchPosts(out chan api.Content) {
 // DownloadRoutine is downloading the files from content chan to files chan using multiple goroutines.
 func (dl *downloader) DownloadRoutine(out chan files.File, in chan api.Content) {
 	var wg sync.WaitGroup
-
 	for i := 0; i < dl.Config.WorkerCount; i++ {
 		wg.Add(1)
 		go func(f chan files.File, c chan api.Content) {
@@ -195,14 +180,11 @@ func (dl *downloader) DownloadRoutine(out chan files.File, in chan api.Content) 
 func (dl *downloader) DownloadFiles(out chan files.File, in chan api.Content) {
 	for content := range in {
 		content := content
-
 		file, err := fetch.File(&content)
 		if err != nil {
 			dl.Stats.append(newFetchError(err, content.URL))
-
 			continue
 		}
-
 		out <- *file
 	}
 }
@@ -212,26 +194,20 @@ func (dl *downloader) SaveFiles(filesChan chan files.File) {
 	if err := files.NavigateTo(dl.Config.Directory, true); err != nil {
 		dl.Stats.Failed.Store(dl.Stats.Queued.Load())
 		dl.Stats.append(fmt.Errorf("failed to navigate to directory, error: %w, directory: %v", err, dl.Config.Directory))
-
 		return
 	}
-
 	for file := range filesChan {
 		file := file
 		filename, err := files.NewFilename(file.Name, file.Extension)
 		if err != nil {
 			dl.Logger.Debugf("error saving file: %v", err)
 			dl.Stats.appendIncr(newDownloadError(err, filename))
-
 			continue
 		}
-
 		if err := files.Save(filename, &file); err != nil {
 			dl.Stats.appendIncr(newDownloadError(err, filename))
-
 			continue
 		}
-
 		dl.Stats.Finished.Add(1)
 		dl.Logger.Debugf("saved file: %v", file.Name)
 	}
@@ -256,7 +232,6 @@ func postsToContent(typ configuration.MediaType, children []api.Child) []api.Con
 	data := make([]api.Content, 0, len(children))
 	for i := 0; i < len(children); i++ {
 		value := &children[i].Data
-
 		if !value.IsVideo && typ == configuration.MediaAny || typ == configuration.MediaImages {
 			for _, img := range value.Preview.Images {
 				data = append(data, api.Content{
@@ -277,6 +252,5 @@ func postsToContent(typ configuration.MediaType, children []api.Child) []api.Con
 			})
 		}
 	}
-
 	return data
 }

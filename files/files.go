@@ -31,7 +31,6 @@ func NewFilename(name, extension string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("error creating filename (%v): %w", name, err)
 	}
-
 	// Resolve duplicates
 	for i := 0; Exists(formatted); i++ {
 		formatted, err = format("("+strconv.Itoa(i)+") "+name, extension)
@@ -39,7 +38,6 @@ func NewFilename(name, extension string) (string, error) {
 			return "", fmt.Errorf("error creating filename (%v): %w", name, err)
 		}
 	}
-
 	return formatted, nil
 }
 
@@ -49,7 +47,6 @@ func Exists(filename string) bool {
 	if err != nil {
 		return os.IsExist(err)
 	}
-
 	return !f.IsDir()
 }
 
@@ -60,7 +57,6 @@ func format(filename, extension string) (string, error) {
 	if filename == "" {
 		return "", fmt.Errorf("empty filename provided")
 	}
-
 	if extension == "" {
 		return "", fmt.Errorf("empty extension provided")
 	}
@@ -73,7 +69,6 @@ func format(filename, extension string) (string, error) {
 		requiredLength := MaxFilenameLength - len(extension) - 1
 		filename = filename[:requiredLength]
 	}
-
 	return filename + "." + extension, nil
 }
 
@@ -83,11 +78,9 @@ func removeForbiddenChars(name string) string {
 		forbiddenChars = []string{"/", "<", ">", ":", "\"", "\\", "|", "?", "*", "(", ")"}
 		result         = name
 	)
-
 	for _, c := range forbiddenChars {
 		result = strings.ReplaceAll(result, c, "")
 	}
-
 	return result
 }
 
@@ -100,11 +93,9 @@ func NavigateTo(dir string, createDir bool) error {
 			}
 		}
 	}
-
 	if err := os.Chdir(dir); err != nil {
 		return fmt.Errorf("error navigating to directory, %w", err)
 	}
-
 	return nil
 }
 
@@ -114,15 +105,12 @@ func Save(filename string, file *File) error {
 	if err != nil {
 		return fmt.Errorf("error creating a file: %w", err)
 	}
-
 	r := bytes.NewReader(file.Data)
 	if _, err := r.WriteTo(f); err != nil {
 		if err := os.Remove(filename); err != nil {
 			return fmt.Errorf("error removing a file: %w", err)
 		}
-
 		return fmt.Errorf("error writing to a file: %w", err)
 	}
-
 	return nil
 }

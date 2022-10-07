@@ -27,7 +27,6 @@ func IsFiltered(cfg *configuration.Data, item api.Content, filters ...Filter) bo
 			return true
 		}
 	}
-
 	return false
 }
 
@@ -50,7 +49,6 @@ func WidthHeight() FilterFunc {
 		if item.Width >= cfg.MinWidth && item.Height >= cfg.MinHeight {
 			return false
 		}
-
 		return true
 	}
 }
@@ -61,7 +59,6 @@ func URLs() FilterFunc {
 		if len(item.URL) > 0 && fetch.IsURL(item.URL) {
 			return false
 		}
-
 		return true
 	}
 }
@@ -72,21 +69,18 @@ func Orientation() FilterFunc {
 		if cfg.Orientation == "" || len(cfg.Orientation) > 1 {
 			return false
 		}
-
 		var landscape, portrait bool
 		if cfg.Orientation == "l" {
 			landscape = true
 		} else if cfg.Orientation == "p" {
 			portrait = true
 		}
-
 		if landscape && item.Width > item.Height {
 			return false
 		}
 		if portrait && item.Width < item.Height {
 			return false
 		}
-
 		return true
 	}
 }

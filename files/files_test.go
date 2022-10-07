@@ -75,7 +75,6 @@ func TestFileExists(t *testing.T) {
 		file, err := os.CreateTemp(os.TempDir(), test.name)
 		if err != nil {
 			t.Errorf("Couldn't create file, name %v, dir %v", test.name, os.TempDir())
-
 			continue
 		}
 

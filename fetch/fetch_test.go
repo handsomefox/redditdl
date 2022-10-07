@@ -8,7 +8,6 @@ import (
 
 func TestNewClient(t *testing.T) {
 	t.Parallel()
-
 	if client := fetch.NewClient(); client == nil {
 		t.Error("Failed to create client") // this will never happen
 	}

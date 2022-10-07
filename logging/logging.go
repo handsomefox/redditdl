@@ -15,10 +15,10 @@ func Get(development bool) *zap.SugaredLogger {
 	if log != nil {
 		return log.Sugar()
 	}
-
-	var cfg zapcore.EncoderConfig
-	var level zapcore.Level
-
+	var (
+		cfg   zapcore.EncoderConfig
+		level zapcore.Level
+	)
 	switch development {
 	case true:
 		cfg = zap.NewDevelopmentEncoderConfig()
@@ -36,6 +36,5 @@ func Get(development bool) *zap.SugaredLogger {
 		zapcore.AddSync(colorable.NewColorableStdout()),
 		level,
 	))
-
 	return log.Sugar()
 }
