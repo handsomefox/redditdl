@@ -33,39 +33,39 @@ func (dl *downloader) Download() *Stats {
 
 	// Fetching posts to the content channel for further download.
 	wg.Add(1)
-	go func(outChan chan structs.Content) {
+	go func(out chan structs.Content) {
 		defer wg.Done()
-		defer close(outChan)
-		dl.FetchPosts(outChan)
+		defer close(out)
+		dl.FetchPosts(out)
 	}(contentChan)
 
 	// Downloading posts from the content channel and storing data in files channel.
 	wg.Add(1)
-	go func(outChan chan structs.File, inChan chan structs.Content) {
+	go func(out chan structs.File, in chan structs.Content) {
 		defer wg.Done()
-		defer close(outChan)
+		defer close(out)
 		dl.DownloadRoutine(filesChan, contentChan)
 	}(filesChan, contentChan)
 
 	// Saving data from files channel to disk.
 	wg.Add(1)
-	go func(inChan chan structs.File) {
+	go func(in chan structs.File) {
 		defer wg.Done()
-		dl.SaveFiles(inChan)
+		dl.SaveFiles(in)
 	}(filesChan)
 
-	terminate := make(chan int8)
+	exitChan := make(chan bool)
 	if dl.Config.ShowProgress {
-		go dl.ShowProgress(terminate)
+		go dl.ShowProgress(exitChan)
 	}
 
 	wg.Wait()
 
 	if dl.Config.ShowProgress {
-		terminate <- 1
+		exitChan <- true
 	}
 
-	close(terminate)
+	close(exitChan)
 
 	return dl.Stats
 }
@@ -185,12 +185,12 @@ func (dl *downloader) SaveFiles(filesChan chan structs.File) {
 }
 
 // ShowProgress prints the current progress of download every two seconds.
-func (dl *downloader) ShowProgress(terminate chan int8) {
+func (dl *downloader) ShowProgress(exit chan bool) {
 	fStr := "Current progress: queued=%d, finished=%d, failed=%d"
 	for {
 		select {
-		case <-terminate:
-			break
+		case <-exit:
+			return
 		default:
 			dl.Logger.Infof(fStr, dl.Stats.Queued.Load(), dl.Stats.Finished.Load(), dl.Stats.Failed.Load())
 			time.Sleep(time.Second)
