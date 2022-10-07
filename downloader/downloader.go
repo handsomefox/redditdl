@@ -204,7 +204,7 @@ func (dl *downloader) SaveFiles(filesChan chan files.File) {
 			dl.Stats.appendIncr(newDownloadError(err, filename))
 			continue
 		}
-		if err := files.Save(filename, &file); err != nil {
+		if err := files.Save(filename, file.Data); err != nil {
 			dl.Stats.appendIncr(newDownloadError(err, filename))
 			continue
 		}

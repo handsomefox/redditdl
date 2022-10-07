@@ -2,7 +2,6 @@
 package files
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"os"
@@ -100,13 +99,12 @@ func NavigateTo(dir string, createDir bool) error {
 }
 
 // Save saves the file to the provided path/filename.
-func Save(filename string, file *File) error {
+func Save(filename string, b []byte) error {
 	f, err := os.Create(filename)
 	if err != nil {
 		return fmt.Errorf("error creating a file: %w", err)
 	}
-	r := bytes.NewReader(file.Data)
-	if _, err := r.WriteTo(f); err != nil {
+	if _, err := f.Write(b); err != nil {
 		if err := os.Remove(filename); err != nil {
 			return fmt.Errorf("error removing a file: %w", err)
 		}
