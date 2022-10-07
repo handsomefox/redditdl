@@ -76,7 +76,7 @@ linters:
     - godot
     - goimports
     - gofmt
-    - gomnd
+    # gomnd
     - gosec
     - ifshort
     - lll
