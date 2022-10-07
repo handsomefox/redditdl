@@ -49,6 +49,7 @@ func FormatURL(cfg *configuration.Data, after string) string {
 	return URL
 }
 
+// File fetches data for a file from reddit's api and returns a *File.
 func File(content *api.Content) (*files.File, error) {
 	client := NewClient()
 
