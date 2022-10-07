@@ -193,7 +193,7 @@ func (dl *downloader) SaveFiles(filesChan chan structs.File) {
 		}
 
 		dl.Stats.Finished.Add(1)
-		dl.Logger.Debugf("saved file: %v to disk", file.Name)
+		dl.Logger.Debugf("saved file: %v", file.Name)
 	}
 }
 
