@@ -68,12 +68,11 @@ func File(content *api.Content) (*files.File, error) {
 		return nil, fmt.Errorf("invalid status code in response: %v", http.StatusText(response.StatusCode))
 	}
 
-	var extension string
+	extension := "jpg" // if we didn't manage to figure out the image extension, assume jpg
 	if content.IsVideo {
 		extension = "mp4" // if we didn't manage to figure out the video extension, assume mp4
-	} else {
-		extension = "jpg" // if we didn't manage to figure out the image extension, assume jpg
 	}
+
 	// the URL path is usually equal to something like "randomid.extension",
 	// this way we can get the actual file extension
 	split := strings.Split(response.Request.URL.Path, ".")
