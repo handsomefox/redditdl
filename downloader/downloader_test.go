@@ -33,11 +33,11 @@ func TestDownload(t *testing.T) {
 	client := downloader.New(&cfg, filter.Default()...)
 	stats := client.Download()
 
-	if len(stats.Errors) != 0 {
-		t.Fatalf("Download(%#v) errors: %v", cfg, stats.Errors)
+	if len(stats.Errors()) != 0 {
+		t.Fatalf("Download(%#v) errors: %v", cfg, stats.Errors())
 	}
-	if stats.Finished.Load() != cfg.Count {
-		t.Fatalf("Download(%#v) loaded %v media, expected %v", cfg, stats.Finished.Load(), cfg.Count)
+	if stats.Finished() != cfg.Count {
+		t.Fatalf("Download(%#v) loaded %v media, expected %v", cfg, stats.Finished(), cfg.Count)
 	}
 }
 
@@ -64,8 +64,8 @@ func BenchmarkDownload(b *testing.B) {
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		cfg.Directory = path.Join(os.TempDir(), strconv.Itoa(i))
-		if stats := client.Download(); len(stats.Errors) != 0 {
-			for _, err := range stats.Errors {
+		if stats := client.Download(); len(stats.Errors()) != 0 {
+			for _, err := range stats.Errors() {
 				b.Error(err)
 			}
 		}

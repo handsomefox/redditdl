@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/handsomefox/redditdl/configuration"
@@ -19,7 +18,7 @@ import (
 // Downloader is a single-method interface which takes in configuration and a list of filters
 // and returns statistics after it is done downloading all the files.
 type Downloader interface {
-	Download() *Stats
+	Download() Stats
 }
 
 // New returns a new Downloader instance with the specified configuration.
@@ -27,40 +26,9 @@ func New(config *configuration.Config, filters ...filter.Filter) Downloader {
 	return &downloader{
 		Config:  config,
 		Logger:  logging.Get(config.Verbose),
-		Stats:   &Stats{},
+		Stats:   &stats{},
 		Filters: filters,
 	}
-}
-
-// Stats is the struct containing statistics for the download.
-// It may or may not be extended with additional data later.
-type Stats struct {
-	Errors []error
-	mu     sync.Mutex
-
-	Queued   atomic.Int64
-	Finished atomic.Int64
-	Failed   atomic.Int64
-}
-
-// append is used to append errors to Stats.
-func (s *Stats) append(err error) {
-	s.mu.Lock()
-	s.Errors = append(s.Errors, err)
-	s.mu.Unlock()
-}
-
-// appendIncr appends the error and increments Failed count.
-func (s *Stats) appendIncr(err error) {
-	s.append(err)
-	s.Failed.Add(1)
-}
-
-// HasErrors returns whether the errors slice is non-empty.
-func (s *Stats) HasErrors() bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return len(s.Errors) != 0
 }
 
 var _ Downloader = &downloader{}
@@ -68,13 +36,13 @@ var _ Downloader = &downloader{}
 type downloader struct {
 	Config  *configuration.Config
 	Logger  *zap.SugaredLogger
-	Stats   *Stats
+	Stats   *stats
 	Filters []filter.Filter
 }
 
 // Download downloads the files using the given parameters to downloader in
 // a concurrent fashion to maximize download speeds.
-func (dl *downloader) Download() *Stats {
+func (dl *downloader) Download() Stats {
 	var (
 		contentChan = make(chan api.Content)
 		filesChan   = make(chan files.File)
@@ -142,7 +110,7 @@ func (dl *downloader) FetchPosts(contentChan chan<- api.Content) {
 			if filter.IsFiltered(dl.Config, c, dl.Filters...) {
 				continue
 			}
-			dl.Stats.Queued.Add(1)
+			dl.Stats.queued.Add(1)
 			count++
 			contentChan <- c
 		}
@@ -191,7 +159,7 @@ func (dl *downloader) DownloadFiles(fileChan chan<- files.File, contentChan <-ch
 // SaveFiles gets data from filesChan and stores it on disk.
 func (dl *downloader) SaveFiles(filesChan <-chan files.File) {
 	if err := files.NavigateTo(dl.Config.Directory, true); err != nil {
-		dl.Stats.Failed.Store(dl.Stats.Queued.Load())
+		dl.Stats.failed.Store(dl.Stats.queued.Load())
 		dl.Stats.append(fmt.Errorf("failed to navigate to directory, error: %w, directory: %v", err, dl.Config.Directory))
 		return
 	}
@@ -207,7 +175,7 @@ func (dl *downloader) SaveFiles(filesChan <-chan files.File) {
 			dl.Stats.appendIncr(newDownloadError(err, filename))
 			continue
 		}
-		dl.Stats.Finished.Add(1)
+		dl.Stats.finished.Add(1)
 		dl.Logger.Debugf("saved file: %v", file.Name)
 	}
 }
@@ -220,7 +188,7 @@ func (dl *downloader) ShowProgress(exit <-chan bool) {
 		case <-exit:
 			return
 		default:
-			dl.Logger.Infof(fStr, dl.Stats.Queued.Load(), dl.Stats.Finished.Load(), dl.Stats.Failed.Load())
+			dl.Logger.Infof(fStr, dl.Stats.queued.Load(), dl.Stats.finished.Load(), dl.Stats.failed.Load())
 			time.Sleep(time.Second)
 		}
 	}

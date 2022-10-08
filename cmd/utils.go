@@ -80,7 +80,7 @@ func RunCommand(cfg *configuration.Config) {
 
 	if stats.HasErrors() {
 		log.Info("Encountered errors during download")
-		for _, err := range stats.Errors {
+		for _, err := range stats.Errors() {
 			log.Errorf("%v", err)
 		}
 	}
@@ -95,5 +95,5 @@ func RunCommand(cfg *configuration.Config) {
 		fStr += "video(s)"
 	}
 
-	log.Infof(fStr, stats.Finished.Load())
+	log.Infof(fStr, stats.Finished())
 }
