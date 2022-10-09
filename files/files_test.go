@@ -2,105 +2,155 @@ package files_test
 
 import (
 	"os"
-	"path/filepath"
+	"path"
 	"testing"
 
 	"github.com/handsomefox/redditdl/files"
 )
 
-func TestCreateFilename(t *testing.T) {
+func TestNewFilename(t *testing.T) {
 	t.Parallel()
-
-	tests := []struct {
-		name, extension, want string
-	}{
-		{"file", "jpg", "file.jpg"},
-		{"//file//", "|||extension", "file.extension"},
-		{"", "png", ""},
-		{"file", "", ""},
+	type args struct {
+		name      string
+		extension string
 	}
-
-	for _, test := range tests {
-		got, err := files.NewFilename(test.name, test.extension)
-		if err != nil {
-			t.Fatalf("NewFilename(%s, %s): %s", test.name, test.extension, err)
-		}
-		if got != test.want {
-			t.Errorf("CreateFilename(%#v) unexpected result, got: %v, want: %v", test, got, test.want)
-		}
+	tests := []struct {
+		name    string
+		args    args
+		want    string
+		wantErr bool
+	}{
+		{
+			name: "Create file.jpg",
+			args: args{
+				name:      "file",
+				extension: "jpg",
+			},
+			want:    "file.jpg",
+			wantErr: false,
+		}, {
+			name: "Create a file with invalid characters",
+			args: args{
+				name:      "/<>:file",
+				extension: "/<>:jpg",
+			},
+			want:    "file.jpg",
+			wantErr: false,
+		}, {
+			name: "Empty name",
+			args: args{
+				name:      "",
+				extension: "jpg",
+			},
+			want:    "",
+			wantErr: true,
+		}, {
+			name: "Empty extension",
+			args: args{
+				name:      "file",
+				extension: "",
+			},
+			want:    "",
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, err := files.NewFilename(tt.args.name, tt.args.extension)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("NewFilename() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("NewFilename() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
 
-func TestNavigateToDirectory(t *testing.T) {
+func TestExists(t *testing.T) {
 	t.Parallel()
-
-	tests := []struct {
-		dir         string
-		create      bool
-		shouldError bool
-	}{
-		{os.TempDir(), false, false},
-		{"dir", true, false},
-		{"zzzzzzzzzzzzzzzzz", false, true},
-	}
-
-	for _, test := range tests {
-		err := files.NavigateTo(test.dir, test.create)
-
-		if test.shouldError && err == nil {
-			t.Errorf("NavigateToDirectory(%#v) unexpected result, got: %v, want: %#v", test, err, test.shouldError)
-		}
-
-		if !test.shouldError && err != nil {
-			t.Errorf("NavigateToDirectory(%#v) unexpected result, got: %v, want: %#v", test, err, test.shouldError)
-		}
-	}
-}
-
-func TestFileExists(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name         string
-		create, want bool
-	}{
-		{"randomfilename", false, false},
-		{"anotherrandomfilename.exe", false, false},
-		{"randomfilename", true, true},
-		{"anotherrandomfilename.exe", true, true},
-	}
-
-	err := files.NavigateTo(os.TempDir(), false)
+	exec, err := os.Executable()
 	if err != nil {
-		t.Fatalf("failed to navigate to folder: %s", os.TempDir())
+		t.Fatalf("couldn't find the running executable")
+	}
+	type args struct {
+		filename string
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{
+			name: "Check existing file",
+			args: args{
+				filename: exec,
+			},
+			want: true,
+		}, {
+			name: "Check non-existing file",
+			args: args{
+				filename: "",
+			},
+			want: false,
+		},
 	}
 
-	for index, test := range tests {
-		if !test.create {
-			continue
-		}
-
-		file, err := os.CreateTemp(os.TempDir(), test.name)
-		if err != nil {
-			t.Errorf("Couldn't create file, name %v, dir %v", test.name, os.TempDir())
-			continue
-		}
-
-		test.name = filepath.Base(file.Name())
-		tests[index].name = filepath.Base(file.Name())
-
-		file.Close()
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := files.Exists(tt.args.filename); got != tt.want {
+				t.Errorf("Exists() = %v, want %v", got, tt.want)
+			}
+		})
 	}
+}
 
-	for _, test := range tests {
-		if got := files.Exists(test.name); got != test.want {
-			t.Errorf("FileExists(%#v) unexpected output, want %v, got %v", test, test.want, got)
-		}
+func TestNavigateTo(t *testing.T) {
+	t.Parallel()
+	type args struct {
+		dir       string
+		createDir bool
 	}
-
-	for _, test := range tests {
-		if test.create {
-			os.Remove(test.name)
-		}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{
+			name: "Navigate to created directory",
+			args: args{
+				dir:       path.Join(os.TempDir(), "test_dir"),
+				createDir: true,
+			},
+			wantErr: false,
+		}, {
+			name: "Navigate to non-existing directory",
+			args: args{
+				dir:       "/<>:",
+				createDir: false,
+			},
+			wantErr: true,
+		}, {
+			name: "Navigate to existing directory",
+			args: args{
+				dir:       os.TempDir(),
+				createDir: false,
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if err := files.NavigateTo(tt.args.dir, tt.args.createDir); (err != nil) != tt.wantErr {
+				t.Errorf("NavigateTo() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
 	}
 }
