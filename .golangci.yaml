@@ -1,7 +1,7 @@
 run:
   skip-dirs-use-default: true
   allow-parallel-runners: true
-  go: "1.19"
+  go: "1.19" # UPDATE
 
 output:
   print-issued-lines: false
@@ -11,7 +11,7 @@ output:
 
 linters-settings:
   staticcheck:
-    go: "1.19"
+    go: "1.19" # UPDATE
   govet:
     enable-all: true
     check-shadowing: false
@@ -60,15 +60,32 @@ linters:
     - sqlclosecheck
     - structcheck
     - wastedassign
-    # annoying
+    # Don't like
+    - cyclop
+    - depguard
+    - dupword
     - exhaustruct
+    - forbidigo
+    - funlen
+    - gci
     - gochecknoglobals
     - gochecknoinits
+    - gocognit
     - godox
+    - goheader
     - gomnd
+    - gomoddirectives
+    - gomodguard
+    - importas
     - ireturn
+    - loggercheck
+    - misspell
     - nlreturn
+    - nolintlint
+    - nonamedreturns
+    - promlinter
     - tagliatelle
+    - testpackage
     - varnamelen
     - wsl
 issues:
