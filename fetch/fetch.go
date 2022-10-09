@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -21,6 +22,8 @@ import (
 const (
 	clientTimeout = time.Minute
 )
+
+var ErrInvalidStatus = errors.New("invalid response status code")
 
 // NewClient returns a pointer to http.Client configured to work with reddit.
 func NewClient() *http.Client {
@@ -55,17 +58,17 @@ func File(content *api.Content) (*files.File, error) {
 
 	request, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, content.URL, http.NoBody)
 	if err != nil {
-		return nil, fmt.Errorf("error creating a request: %w", err)
+		return nil, fmt.Errorf("%w: %s", err, "couldn't create the request")
 	}
 
 	response, err := client.Do(request)
 	if err != nil {
-		return nil, fmt.Errorf("error making a request: %w", err)
+		return nil, fmt.Errorf("%w: %s", err, "couldn't perform the request")
 	}
 	defer response.Body.Close()
 
 	if response.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("invalid status code in response: %v", http.StatusText(response.StatusCode))
+		return nil, fmt.Errorf("%w: %s", ErrInvalidStatus, http.StatusText(response.StatusCode))
 	}
 
 	extension := "jpg" // if we didn't manage to figure out the image extension, assume jpg
@@ -82,7 +85,7 @@ func File(content *api.Content) (*files.File, error) {
 
 	b, err := io.ReadAll(response.Body)
 	if err != nil {
-		return nil, fmt.Errorf("error reading response body: %w", err)
+		return nil, fmt.Errorf("%w: %s", err, "couldn't read response body")
 	}
 
 	return files.New(content.Name, extension, b), nil
@@ -95,23 +98,23 @@ func Posts(path string) (*api.Posts, error) {
 
 	request, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, path, http.NoBody)
 	if err != nil {
-		return nil, fmt.Errorf("error creating a request: %w", err)
+		return nil, fmt.Errorf("%w: %s", err, "couldn't create the request")
 	}
 	request.Header.Add("User-Agent", "go:getter")
 
 	response, err := client.Do(request)
 	if err != nil {
-		return nil, fmt.Errorf("fetching from reddit failed, error: %w", err)
+		return nil, fmt.Errorf("%w: %s", err, "couldn't fetch posts from reddit")
 	}
 	defer response.Body.Close()
 
 	if response.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("%s: %v", "unexpected status in response", http.StatusText(response.StatusCode))
+		return nil, fmt.Errorf("%w: %s", ErrInvalidStatus, http.StatusText(response.StatusCode))
 	}
 
 	posts := &api.Posts{}
 	if err := json.NewDecoder(response.Body).Decode(posts); err != nil {
-		return nil, fmt.Errorf("error decoding posts: %w", err)
+		return nil, fmt.Errorf("%w: %s", err, "couldn't decode posts")
 	}
 
 	return posts, nil

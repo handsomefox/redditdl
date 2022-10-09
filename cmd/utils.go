@@ -81,7 +81,7 @@ func RunCommand(cfg *configuration.Config) {
 	if stats.HasErrors() {
 		log.Info("Encountered errors during download")
 		for _, err := range stats.Errors() {
-			log.Errorf("%v", err)
+			log.Errorf("%s", err)
 		}
 	}
 

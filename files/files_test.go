@@ -21,7 +21,10 @@ func TestCreateFilename(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		got, _ := files.NewFilename(test.name, test.extension)
+		got, err := files.NewFilename(test.name, test.extension)
+		if err != nil {
+			t.Fatalf("NewFilename(%s, %s): %s", test.name, test.extension, err)
+		}
 		if got != test.want {
 			t.Errorf("CreateFilename(%#v) unexpected result, got: %v, want: %v", test, got, test.want)
 		}
@@ -55,6 +58,8 @@ func TestNavigateToDirectory(t *testing.T) {
 }
 
 func TestFileExists(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name         string
 		create, want bool
@@ -65,7 +70,10 @@ func TestFileExists(t *testing.T) {
 		{"anotherrandomfilename.exe", true, true},
 	}
 
-	_ = files.NavigateTo(os.TempDir(), false)
+	err := files.NavigateTo(os.TempDir(), false)
+	if err != nil {
+		t.Fatalf("failed to navigate to folder: %s", os.TempDir())
+	}
 
 	for index, test := range tests {
 		if !test.create {

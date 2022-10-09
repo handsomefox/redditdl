@@ -91,7 +91,7 @@ func (dl *downloader) FetchPosts(contentChan chan<- api.Content) {
 	)
 	for count < dl.Config.Count {
 		url := fetch.FormatURL(dl.Config, after)
-		dl.Logger.Debugf("fetching posts from: %v", url)
+		dl.Logger.Debugf("Fetching posts from: %s", url)
 
 		posts, err := fetch.Posts(url)
 		if err != nil {
@@ -99,10 +99,10 @@ func (dl *downloader) FetchPosts(contentChan chan<- api.Content) {
 			continue
 		}
 
-		dl.Logger.Debug("converting posts")
+		dl.Logger.Debug("Converting response")
 		content := postsToContent(dl.Config.ContentType, posts.Data.Children)
 
-		dl.Logger.Debug("filtering posts")
+		dl.Logger.Debug("Filtering posts")
 		for _, c := range content {
 			if count == dl.Config.Count {
 				break
@@ -119,13 +119,13 @@ func (dl *downloader) FetchPosts(contentChan chan<- api.Content) {
 			break
 		}
 		if len(posts.Data.Children) == 0 || posts.Data.After == after || posts.Data.After == "" {
-			dl.Logger.Info("no more posts to fetch (or rate limited)")
+			dl.Logger.Info("There's no more posts to fetch")
 			break
 		}
 
 		after = posts.Data.After
 
-		dl.Logger.Debugf("fetching goroutine sleeping")
+		dl.Logger.Debugf("Fetch is sleeping...")
 		time.Sleep(dl.Config.SleepTime)
 	}
 }
@@ -160,14 +160,14 @@ func (dl *downloader) DownloadFiles(fileChan chan<- files.File, contentChan <-ch
 func (dl *downloader) SaveFiles(filesChan <-chan files.File) {
 	if err := files.NavigateTo(dl.Config.Directory, true); err != nil {
 		dl.Stats.failed.Store(dl.Stats.queued.Load())
-		dl.Stats.append(fmt.Errorf("failed to navigate to directory, error: %w, directory: %v", err, dl.Config.Directory))
+		dl.Stats.append(fmt.Errorf("%w: failed to navigate to directory %s", err, dl.Config.Directory))
 		return
 	}
 	for file := range filesChan {
 		file := file
 		filename, err := files.NewFilename(file.Name, file.Extension)
 		if err != nil {
-			dl.Logger.Debugf("error saving file: %v", err)
+			dl.Logger.Debugf("%s: failed to save file", err)
 			dl.Stats.appendIncr(newDownloadError(err, filename))
 			continue
 		}
@@ -176,7 +176,7 @@ func (dl *downloader) SaveFiles(filesChan <-chan files.File) {
 			continue
 		}
 		dl.Stats.finished.Add(1)
-		dl.Logger.Debugf("saved file: %v", file.Name)
+		dl.Logger.Debugf("saved file: %s", file.Name)
 	}
 }
 

@@ -9,6 +9,8 @@ import (
 	"strings"
 )
 
+var ErrEmpty = errors.New("empty parameter provided")
+
 // File is the structure that is saved to disk later.
 type File struct {
 	Name, Extension string
@@ -28,13 +30,13 @@ func New(name, ext string, data []byte) *File {
 func NewFilename(name, extension string) (string, error) {
 	formatted, err := format(name, extension)
 	if err != nil {
-		return "", fmt.Errorf("error creating filename (%v): %w", name, err)
+		return "", fmt.Errorf("%w: failed to create filename (name=%s,ext=%s)", err, name, extension)
 	}
 	// Resolve duplicates
 	for i := 0; Exists(formatted); i++ {
 		formatted, err = format("("+strconv.Itoa(i)+") "+name, extension)
 		if err != nil {
-			return "", fmt.Errorf("error creating filename (%v): %w", name, err)
+			return "", fmt.Errorf("%w: failed to create filename (name=%s,ext=%s)", err, name, extension)
 		}
 	}
 	return formatted, nil
@@ -54,10 +56,10 @@ const MaxFilenameLength = 200
 // format ensures that the filename is valid for NTFS and has the right extension.
 func format(filename, extension string) (string, error) {
 	if filename == "" {
-		return "", fmt.Errorf("empty filename provided")
+		return "", fmt.Errorf("%w: filename can not be empty", ErrEmpty)
 	}
 	if extension == "" {
-		return "", fmt.Errorf("empty extension provided")
+		return "", fmt.Errorf("%w: extension can not be empty", ErrEmpty)
 	}
 
 	filename = removeForbiddenChars(filename)
@@ -88,12 +90,12 @@ func NavigateTo(dir string, createDir bool) error {
 	if createDir {
 		if err := os.Mkdir(dir, os.ModePerm); err != nil {
 			if !errors.Is(err, os.ErrExist) {
-				return fmt.Errorf("error creating a directory, %w", err)
+				return fmt.Errorf("%w: couldn't create directory(name=%s)", err, dir)
 			}
 		}
 	}
 	if err := os.Chdir(dir); err != nil {
-		return fmt.Errorf("error navigating to directory, %w", err)
+		return fmt.Errorf("%w: couldn't navigate to directory(name=%s)", err, dir)
 	}
 	return nil
 }
@@ -102,13 +104,13 @@ func NavigateTo(dir string, createDir bool) error {
 func Save(filename string, b []byte) error {
 	f, err := os.Create(filename)
 	if err != nil {
-		return fmt.Errorf("error creating a file: %w", err)
+		return fmt.Errorf("%w: couldn't create file(name=%s)", err, filename)
 	}
 	if _, err := f.Write(b); err != nil {
 		if err := os.Remove(filename); err != nil {
-			return fmt.Errorf("error removing a file: %w", err)
+			return fmt.Errorf("%w: couldn't remove file(name=%s)", err, filename)
 		}
-		return fmt.Errorf("error writing to a file: %w", err)
+		return fmt.Errorf("%w: couldn't write file(name=%s)", err, filename)
 	}
 	return nil
 }

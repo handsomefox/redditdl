@@ -8,7 +8,7 @@ import (
 var _ Stats = &stats{}
 
 // Stats is the interface that describes the statistics
-// for the current downloader
+// for the current downloader.
 type Stats interface {
 	Errors() []error
 	HasErrors() bool
