@@ -1,33 +1,13 @@
 package fetch_test
 
 import (
-	"net/http"
-	"reflect"
 	"testing"
 
 	"github.com/handsomefox/redditdl/fetch"
 )
 
-func TestNewClient(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		name string
-		want *http.Client
-	}{
-		{},
-	}
-	for _, tt := range tests {
-		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			if got := fetch.NewClient(); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("NewClient() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
 func TestIsURL(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		str string
 	}
@@ -80,7 +60,9 @@ func TestIsURL(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			if got := fetch.IsURL(tt.args.str); got != tt.want {
 				t.Errorf("IsURL() = %v, want %v", got, tt.want)
 			}
