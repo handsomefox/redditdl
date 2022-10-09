@@ -1,41 +1,25 @@
-linters-settings:
-  govet:
-    check-shadowing: false
-    enable:
-      - assign
-      - atomic
-      - atomicalign
-      - bools
-      - copylocks
-      - deepequalerrors
-      - errorsas
-      - fieldalignment
-      - findcall
-      - httpresponse
-      - ifaceassert
-      - loopclosure
-      - lostcancel
-      - nilfunc
-      - nilness
-      - printf
-      - shift
-      - sortslice
-      - stdmethods
-      - stringintconv
-      - structtag
-      - testinggoroutine
-      - tests
-      - unmarshal
-      - unreachable
-      - unsafeptr
-      - unusedresult
-      - unusedwrite
+run:
+  skip-dirs-use-default: true
+  allow-parallel-runners: true
+  go: "1.19"
 
+output:
+  print-issued-lines: false
+  print-linter-name: true
+  unique-by-line: false
+  sort-results: true
+
+linters-settings:
+  staticcheck:
+    go: "1.19"
+  govet:
+    enable-all: true
+    check-shadowing: false
+    disable:
+      - shadow
   errcheck:
+    check-blank: true
     check-type-assertions: true
-  goconst:
-    min-len: 2
-    min-occurrences: 3
   gocritic:
     enabled-tags:
       - diagnostic
@@ -43,62 +27,49 @@ linters-settings:
       - opinionated
       - performance
       - style
-  nolintlint:
-    require-specific: true
-
+      # - security
 linters:
-  disable-all: true
-  enable:
-    # default
-    - deadcode
-    - errcheck
-    - gosimple
-    - govet
-    - ineffassign
-    - staticcheck
-    - structcheck
-    - typecheck
+  fast: false
+  presets:
+    - bugs
+    - comment
+    - complexity
+    - error
+    - format
+    - import
+    - metalinter
+    - module
+    - performance
+    - sql
+    - style
+    - test
     - unused
-    - varcheck
-    - bidichk
-    - bodyclose
-    - cyclop
-    - dogsled
-    - dupl
-    - durationcheck
-    - errname
-    - errorlint
-    - exhaustive
-    - exportloopref
-    - forcetypeassert
-    - goconst
-    - gocritic
-    - godot
-    - goimports
-    - gofmt
-    # gomnd
-    - gosec
+  disable:
+    # deprecated
+    - deadcode
+    - exhaustivestruct
+    - golint
     - ifshort
-    - lll
-    - maintidx
-    - makezero
-    - misspell
-    - nakedret
-    - nestif
-    - nilerr
-    - nilnil
-    # - nlreturn
-    - noctx
-    - nosprintfhostport
-    - prealloc
-    - predeclared
-    - revive
-    - stylecheck
-    - testpackage
-    - thelper
-    - tparallel
-    - unconvert
+    - interfacer
+    - maligned
+    - nosnakecase
+    - scopelint
+    - varcheck
+    # issues with generics
+    - rowserrcheck
+    - sqlclosecheck
+    - structcheck
     - wastedassign
-    - whitespace
-    - wrapcheck
-    # wsl
+    # annoying
+    - exhaustruct
+    - gochecknoglobals
+    - gochecknoinits
+    - gomnd
+    - ireturn
+    - nlreturn
+    - tagliatelle
+    - varnamelen
+    - wsl
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
