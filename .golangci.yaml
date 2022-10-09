@@ -64,6 +64,7 @@ linters:
     - exhaustruct
     - gochecknoglobals
     - gochecknoinits
+    - godox
     - gomnd
     - ireturn
     - nlreturn
