@@ -23,7 +23,7 @@ const (
 	clientTimeout = time.Minute
 )
 
-var ErrInvalidStatus = errors.New("invalid response status code")
+var ErrInvalidStatus = errors.New("unexpected status code in response")
 
 // NewClient returns a pointer to http.Client configured to work with reddit.
 func NewClient() *http.Client {
