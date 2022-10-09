@@ -32,19 +32,19 @@ func IsFiltered(cfg *configuration.Config, item api.Content, filters ...Filter) 
 
 // Filter is an interface that filters the given item and returns the result of filtering (true/false).
 type Filter interface {
-	// Filters returns whether the applied filters say that the item should be filtered out.
+	// Filters returns whether the item should be filtered out.
 	Filters(api.Content, *configuration.Config) bool
 }
 
-// FilterFunc implements filter interface and expects the function to return a boolean.
-type FilterFunc func(api.Content, *configuration.Config) bool
+// DeciderFunc implements filter interface and expects the function to return a boolean.
+type DeciderFunc func(api.Content, *configuration.Config) bool
 
-func (f FilterFunc) Filters(c api.Content, d *configuration.Config) bool {
-	return f(c, d)
+func (fn DeciderFunc) Filters(c api.Content, d *configuration.Config) bool {
+	return fn(c, d)
 }
 
 // WidthHeight is a filter that filters images by specified width and height from settings.
-func WidthHeight() FilterFunc {
+func WidthHeight() DeciderFunc {
 	return func(item api.Content, cfg *configuration.Config) bool {
 		if item.Width >= cfg.MinWidth && item.Height >= cfg.MinHeight {
 			return false
@@ -54,7 +54,7 @@ func WidthHeight() FilterFunc {
 }
 
 // URLs is a filter that filters out invalid URLs.
-func URLs() FilterFunc {
+func URLs() DeciderFunc {
 	return func(item api.Content, cfg *configuration.Config) bool {
 		if len(item.URL) > 0 && fetch.IsURL(item.URL) {
 			return false
@@ -64,7 +64,7 @@ func URLs() FilterFunc {
 }
 
 // Orientation is a filter that filters images by specified orientation.
-func Orientation() FilterFunc {
+func Orientation() DeciderFunc {
 	return func(item api.Content, cfg *configuration.Config) bool {
 		if cfg.Orientation == "" || len(cfg.Orientation) > 1 {
 			return false
