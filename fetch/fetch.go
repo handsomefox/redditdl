@@ -83,12 +83,18 @@ func File(content *api.Content) (*files.File, error) {
 		extension = split[1]
 	}
 
-	b, err := io.ReadAll(response.Body)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %s", err, "couldn't read response body")
+	f := &files.File{
+		Name:      content.Name,
+		Extension: extension,
+		Data:      nil,
 	}
 
-	return files.New(content.Name, extension, b), nil
+	_, err = io.Copy(f, response.Body)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %s", err, "couldn't copy response body")
+	}
+
+	return f, nil
 }
 
 // Posts fetches a json file from reddit containing information
