@@ -23,6 +23,8 @@ const (
 	clientTimeout = time.Minute
 )
 
+var client = NewClient()
+
 var ErrInvalidStatus = errors.New("unexpected status code in response")
 
 // NewClient returns a pointer to http.Client configured to work with reddit.
@@ -54,8 +56,6 @@ func FormatURL(cfg *configuration.Config, after string) string {
 
 // File fetches data for a file from reddit's api and returns a *File.
 func File(content *api.Content) (*files.File, error) {
-	client := NewClient()
-
 	request, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, content.URL, http.NoBody)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s", err, "couldn't create the request")
@@ -94,8 +94,6 @@ func File(content *api.Content) (*files.File, error) {
 // Posts fetches a json file from reddit containing information
 // about the posts using the given configuration.
 func Posts(path string) (*api.Posts, error) {
-	client := NewClient()
-
 	request, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, path, http.NoBody)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s", err, "couldn't create the request")
