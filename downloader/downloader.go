@@ -44,27 +44,27 @@ type downloader struct {
 // a concurrent fashion to maximize download speeds.
 func (dl *downloader) Download() Stats {
 	var (
-		contentChan = make(chan api.Content)
-		filesChan   = make(chan files.File)
+		contentChan = make(chan *api.Content)
+		filesChan   = make(chan *files.File)
 		wg          sync.WaitGroup
 	)
 	// Fetching posts to the content channel for further download.
 	wg.Add(1)
-	go func(c chan<- api.Content) {
+	go func(c chan<- *api.Content) {
 		defer wg.Done()
 		defer close(c)
 		dl.FetchPosts(c)
 	}(contentChan)
 	// Downloading posts from the content channel and storing data in files channel.
 	wg.Add(1)
-	go func(f chan<- files.File, c <-chan api.Content) {
+	go func(f chan<- *files.File, c <-chan *api.Content) {
 		defer wg.Done()
 		defer close(f)
 		dl.DownloadRoutine(f, c)
 	}(filesChan, contentChan)
 	// Saving data from files channel to disk.
 	wg.Add(1)
-	go func(f <-chan files.File) {
+	go func(f <-chan *files.File) {
 		defer wg.Done()
 		dl.SaveFiles(f)
 	}(filesChan)
@@ -84,7 +84,7 @@ func (dl *downloader) Download() Stats {
 }
 
 // FetchPosts is fetching, filtering and sending posts to outChan.
-func (dl *downloader) FetchPosts(contentChan chan<- api.Content) {
+func (dl *downloader) FetchPosts(contentChan chan<- *api.Content) {
 	var (
 		count int64
 		after string
@@ -104,6 +104,7 @@ func (dl *downloader) FetchPosts(contentChan chan<- api.Content) {
 
 		dl.Logger.Debug("Filtering posts")
 		for _, c := range content {
+			c := c
 			if count == dl.Config.Count {
 				break
 			}
@@ -112,7 +113,7 @@ func (dl *downloader) FetchPosts(contentChan chan<- api.Content) {
 			}
 			dl.Stats.queued.Add(1)
 			count++
-			contentChan <- c
+			contentChan <- &c
 		}
 		// another check prevents us from going to sleep for SleepTime if we have enough links.
 		if count == dl.Config.Count {
@@ -131,11 +132,11 @@ func (dl *downloader) FetchPosts(contentChan chan<- api.Content) {
 }
 
 // DownloadRoutine is downloading the files from content chan to files chan using multiple goroutines.
-func (dl *downloader) DownloadRoutine(fileChan chan<- files.File, contentChan <-chan api.Content) {
+func (dl *downloader) DownloadRoutine(fileChan chan<- *files.File, contentChan <-chan *api.Content) {
 	var wg sync.WaitGroup
 	for i := 0; i < dl.Config.WorkerCount; i++ {
 		wg.Add(1)
-		go func(f chan<- files.File, c <-chan api.Content) {
+		go func(f chan<- *files.File, c <-chan *api.Content) {
 			defer wg.Done()
 			dl.DownloadFiles(f, c)
 		}(fileChan, contentChan)
@@ -144,27 +145,25 @@ func (dl *downloader) DownloadRoutine(fileChan chan<- files.File, contentChan <-
 }
 
 // DownloadFiles gets files from the inChan, fetches their data and stores it in outChan.
-func (dl *downloader) DownloadFiles(fileChan chan<- files.File, contentChan <-chan api.Content) {
+func (dl *downloader) DownloadFiles(fileChan chan<- *files.File, contentChan <-chan *api.Content) {
 	for content := range contentChan {
-		content := content
-		file, err := fetch.File(&content)
+		file, err := fetch.File(content)
 		if err != nil {
 			dl.Stats.append(newFetchError(err, content.URL))
 			continue
 		}
-		fileChan <- *file
+		fileChan <- file
 	}
 }
 
 // SaveFiles gets data from filesChan and stores it on disk.
-func (dl *downloader) SaveFiles(filesChan <-chan files.File) {
+func (dl *downloader) SaveFiles(filesChan <-chan *files.File) {
 	if err := files.NavigateTo(dl.Config.Directory, true); err != nil {
 		dl.Stats.failed.Store(dl.Stats.queued.Load())
 		dl.Stats.append(fmt.Errorf("%w: failed to navigate to directory %s", err, dl.Config.Directory))
 		return
 	}
 	for file := range filesChan {
-		file := file
 		filename, err := files.NewFilename(file.Name, file.Extension)
 		if err != nil {
 			dl.Logger.Debugf("%s: failed to save file", err)
