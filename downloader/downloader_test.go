@@ -41,27 +41,79 @@ func TestDownload(t *testing.T) {
 	}
 }
 
-func BenchmarkDownload(b *testing.B) {
-	b.StopTimer()
-
-	cfg := configuration.Config{
-		Directory:    "",
+func setupConfig(count int64) configuration.Config {
+	return configuration.Config{
+		Directory:    strconv.Itoa(int(count)),
 		Subreddit:    "wallpaper",
 		Sorting:      "best",
 		Timeframe:    "all",
 		Orientation:  "",
-		Count:        35,
-		MinWidth:     1920,
-		MinHeight:    1080,
+		Count:        count,
+		MinWidth:     0,
+		MinHeight:    0,
 		WorkerCount:  configuration.DefaultWorkerCount,
 		SleepTime:    configuration.DefaultSleepTime,
 		Verbose:      false,
 		ShowProgress: false,
-		ContentType:  configuration.ContentAny,
+		ContentType:  configuration.ContentImages,
 	}
+}
 
+func BenchmarkDownload1(b *testing.B) {
+	cfg := setupConfig(1)
 	client := downloader.New(&cfg, filter.Default()...)
-	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		cfg.Directory = path.Join(os.TempDir(), strconv.Itoa(i))
+		if stats := client.Download(); len(stats.Errors()) != 0 {
+			for _, err := range stats.Errors() {
+				b.Error(err)
+			}
+		}
+	}
+}
+
+func BenchmarkDownload10(b *testing.B) {
+	cfg := setupConfig(10)
+	client := downloader.New(&cfg, filter.Default()...)
+	for i := 0; i < b.N; i++ {
+		cfg.Directory = path.Join(os.TempDir(), strconv.Itoa(i))
+		if stats := client.Download(); len(stats.Errors()) != 0 {
+			for _, err := range stats.Errors() {
+				b.Error(err)
+			}
+		}
+	}
+}
+
+func BenchmarkDownload25(b *testing.B) {
+	cfg := setupConfig(25)
+	client := downloader.New(&cfg, filter.Default()...)
+	for i := 0; i < b.N; i++ {
+		cfg.Directory = path.Join(os.TempDir(), strconv.Itoa(i))
+		if stats := client.Download(); len(stats.Errors()) != 0 {
+			for _, err := range stats.Errors() {
+				b.Error(err)
+			}
+		}
+	}
+}
+
+func BenchmarkDownload50(b *testing.B) {
+	cfg := setupConfig(50)
+	client := downloader.New(&cfg, filter.Default()...)
+	for i := 0; i < b.N; i++ {
+		cfg.Directory = path.Join(os.TempDir(), strconv.Itoa(i))
+		if stats := client.Download(); len(stats.Errors()) != 0 {
+			for _, err := range stats.Errors() {
+				b.Error(err)
+			}
+		}
+	}
+}
+
+func BenchmarkDownload100(b *testing.B) {
+	cfg := setupConfig(100)
+	client := downloader.New(&cfg, filter.Default()...)
 	for i := 0; i < b.N; i++ {
 		cfg.Directory = path.Join(os.TempDir(), strconv.Itoa(i))
 		if stats := client.Download(); len(stats.Errors()) != 0 {
