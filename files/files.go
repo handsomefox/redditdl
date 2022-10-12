@@ -109,14 +109,7 @@ func NavigateTo(dir string, createDir bool) error {
 
 // Save saves the file to the provided path/filename.
 func Save(filename string, b []byte) error {
-	f, err := os.Create(filename)
-	if err != nil {
-		return fmt.Errorf("%w: couldn't create file(name=%s)", err, filename)
-	}
-	if _, err := f.Write(b); err != nil {
-		if err := os.Remove(filename); err != nil {
-			return fmt.Errorf("%w: couldn't remove file(name=%s)", err, filename)
-		}
+	if err := os.WriteFile(filename, b, 0o600); err != nil {
 		return fmt.Errorf("%w: couldn't write file(name=%s)", err, filename)
 	}
 	return nil
