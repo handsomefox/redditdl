@@ -1,4 +1,4 @@
-// filter is a package that is used to implement functions
+// Package filter is a package that is used to implement functions
 // that act upon reddit's content and can filter out
 // things that user does not need to download
 // depending on content parameters (like resolution)

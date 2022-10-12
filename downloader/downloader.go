@@ -1,3 +1,5 @@
+// Package downloader is a package that can be
+// used to download media files from reddit.com
 package downloader
 
 import (

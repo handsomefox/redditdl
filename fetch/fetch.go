@@ -1,4 +1,4 @@
-// fetch is a package for fetching posts from reddit.com
+// Package fetch is a package for fetching posts from reddit.com
 // and some utility-like functions.
 package fetch
 

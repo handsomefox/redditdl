@@ -1,4 +1,4 @@
-// api is a package containing data structures that mimic reddit.com responses.
+// Package api is a package containing data structures that mimic reddit.com responses.
 package api
 
 // Content contains information which is required to filter by resolution,

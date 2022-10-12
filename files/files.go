@@ -1,4 +1,4 @@
-// files is a package with utility-like file functions used in redditdl
+// Package files is a package with utility-like file functions used in redditdl
 package files
 
 import (

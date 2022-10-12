@@ -1,4 +1,4 @@
-// logging is a wrapper around uber/zap logger
+// Package logging is a wrapper around uber/zap logger
 // to quickly get a configured logger.
 package logging
 
