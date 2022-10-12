@@ -20,11 +20,17 @@ import (
 )
 
 const (
+	// clientTimetout is the timeout used in
+	// 	client := NewClient()
 	clientTimeout = time.Minute
 )
 
+// client  is the global client used in package fetch to do requests.
+// This is safe, and also better than using a client per request.
 var client = NewClient()
 
+// ErrInvalidStatus is an error returned by package fetch
+// in cases when the response status code was not expected.
 var ErrInvalidStatus = errors.New("unexpected status code in response")
 
 // NewClient returns a pointer to http.Client configured to work with reddit.
@@ -37,11 +43,23 @@ func NewClient() *http.Client {
 	}
 }
 
+// IsValidURL checks if the URL is valid.
+//
+// Example:
+//
+//	fmt.Println(fetch.IsValidURL("www.google.com"))
+//	Output: true
+//
+// Invalid example:
+//
+//	fmt.Println(fetch.IsValidURL("google.com"))
+//	Output: false
 func IsValidURL(str string) bool {
 	u, err := url.ParseRequestURI(str)
 	return err == nil && u.Host != "" && u.Scheme != ""
 }
 
+// fStr is the expected format for the request URL to reddit.com
 const fStr = "https://www.reddit.com/r/%s/%s.json?limit=%d&t=%s"
 
 // FormatURL formats the URL using the configuration.
