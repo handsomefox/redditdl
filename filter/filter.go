@@ -39,6 +39,7 @@ type Filter interface {
 // DeciderFunc implements filter interface and expects the function to return a boolean.
 type DeciderFunc func(api.Content, *configuration.Config) bool
 
+// Filters is the implementation of Filter interface.
 func (fn DeciderFunc) Filters(c api.Content, d *configuration.Config) bool {
 	return fn(c, d)
 }
