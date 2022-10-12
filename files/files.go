@@ -16,13 +16,6 @@ type File struct {
 	Data            []byte
 }
 
-// Write implements io.Writer.
-func (f *File) Write(p []byte) (int, error) {
-	f.Data = make([]byte, 0, len(p)) // this saves a lot of memory according to benchmarks
-	f.Data = append(f.Data, p...)
-	return len(p), nil
-}
-
 // New returns a pointer to a new File.
 func New(name, ext string, data []byte) *File {
 	return &File{
