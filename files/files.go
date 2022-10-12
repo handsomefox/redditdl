@@ -17,6 +17,10 @@ type File struct {
 }
 
 // New returns a pointer to a new File.
+//
+// Example:
+//
+//	f := files.New("image", "jpg", []byte{12,23,54})
 func New(name, ext string, data []byte) *File {
 	return &File{
 		Name:      name,
@@ -26,6 +30,14 @@ func New(name, ext string, data []byte) *File {
 }
 
 // NewFilename generates a valid filename for the media.
+//
+// It accounts for:
+//   - Invalid characters;
+//   - Names that exceed allowed length;
+//   - Name collisions.
+//
+// It returns an error when:
+//   - Name or Extensions arguments are empty.
 func NewFilename(name, extension string) (string, error) {
 	formatted, err := format(name, extension)
 	if err != nil {
@@ -49,7 +61,7 @@ func Exists(filename string) bool {
 	return true
 }
 
-const MaxFilenameLength = 255
+const MaxFilenameLength = 255 // This really only accounts for NTFS.
 
 // format ensures that the filename is valid for NTFS and has the right extension.
 func format(filename, extension string) (string, error) {
@@ -71,6 +83,7 @@ func format(filename, extension string) (string, error) {
 	return fmt.Sprintf("%s.%s", filename, extension), nil
 }
 
+// Most of the characters are forbidden on Windows only.
 var forbiddenChars = []string{"/", "<", ">", ":", "\"", "\\", "|", "?", "*"}
 
 // removeForbiddenChars removes invalid characters for Linux/Windows filenames.
