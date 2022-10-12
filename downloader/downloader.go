@@ -197,23 +197,25 @@ func (dl *downloader) ShowProgress(exit <-chan bool) {
 func postsToContent(typ configuration.ContentType, children []api.Child) []api.Content {
 	data := make([]api.Content, 0, len(children))
 	for i := 0; i < len(children); i++ {
-		value := &children[i].Data
-		if !value.IsVideo && typ == configuration.ContentAny || typ == configuration.ContentImages {
-			for _, img := range value.Preview.Images {
-				data = append(data, api.Content{
-					Name:    value.Title,
-					URL:     strings.ReplaceAll(img.Source.URL, "&amp;s", "&s"),
-					Width:   img.Source.Width,
-					Height:  img.Source.Height,
-					IsVideo: false,
-				})
+		v := &children[i].Data
+		if !v.IsVideo && (typ == configuration.ContentAny || typ == configuration.ContentImages) {
+			if len(v.Preview.Images) != 1 {
+				continue
 			}
-		} else if value.IsVideo && typ == configuration.ContentAny || typ == configuration.ContentVideos {
+			img := &v.Preview.Images[0]
 			data = append(data, api.Content{
-				Name:    value.Title,
-				URL:     strings.ReplaceAll(value.Media.RedditVideo.ScrubberMediaURL, "&amp;s", "&s"),
-				Width:   value.Media.RedditVideo.Width,
-				Height:  value.Media.RedditVideo.Height,
+				Name:    v.Title,
+				URL:     strings.ReplaceAll(img.Source.URL, "&amp;s", "&s"),
+				Width:   img.Source.Width,
+				Height:  img.Source.Height,
+				IsVideo: false,
+			})
+		} else if v.IsVideo && (typ == configuration.ContentAny || typ == configuration.ContentVideos) {
+			data = append(data, api.Content{
+				Name:    v.Title,
+				URL:     strings.ReplaceAll(v.Media.RedditVideo.ScrubberMediaURL, "&amp;s", "&s"),
+				Width:   v.Media.RedditVideo.Width,
+				Height:  v.Media.RedditVideo.Height,
 				IsVideo: true,
 			})
 		}
