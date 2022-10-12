@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 )
 
@@ -34,7 +33,7 @@ func NewFilename(name, extension string) (string, error) {
 	}
 	// Resolve duplicates
 	for i := 0; Exists(formatted); i++ {
-		formatted, err = format("("+strconv.Itoa(i)+") "+name, extension)
+		formatted, err = format(fmt.Sprintf("(%d) %s", i, name), extension)
 		if err != nil {
 			return "", fmt.Errorf("%w: failed to create filename (name=%s,ext=%s)", err, name, extension)
 		}
@@ -44,14 +43,13 @@ func NewFilename(name, extension string) (string, error) {
 
 // Exists returns whether the file exists.
 func Exists(filename string) bool {
-	f, err := os.Stat(filename)
-	if err != nil {
-		return os.IsExist(err)
+	if _, err := os.Stat(filename); err != nil {
+		return false
 	}
-	return !f.IsDir()
+	return true
 }
 
-const MaxFilenameLength = 200
+const MaxFilenameLength = 255
 
 // format ensures that the filename is valid for NTFS and has the right extension.
 func format(filename, extension string) (string, error) {
@@ -70,19 +68,17 @@ func format(filename, extension string) (string, error) {
 		requiredLength := MaxFilenameLength - len(extension) - 1
 		filename = filename[:requiredLength]
 	}
-	return filename + "." + extension, nil
+	return fmt.Sprintf("%s.%s", filename, extension), nil
 }
+
+var forbiddenChars = []string{"/", "<", ">", ":", "\"", "\\", "|", "?", "*"}
 
 // removeForbiddenChars removes invalid characters for Linux/Windows filenames.
 func removeForbiddenChars(name string) string {
-	var (
-		forbiddenChars = []string{"/", "<", ">", ":", "\"", "\\", "|", "?", "*", "(", ")"}
-		result         = name
-	)
 	for _, c := range forbiddenChars {
-		result = strings.ReplaceAll(result, c, "")
+		name = strings.ReplaceAll(name, c, "")
 	}
-	return result
+	return name
 }
 
 // NavigateTo moves to the provided directory and creates it if necessary.
@@ -102,14 +98,7 @@ func NavigateTo(dir string, createDir bool) error {
 
 // Save saves the file to the provided path/filename.
 func Save(filename string, b []byte) error {
-	f, err := os.Create(filename)
-	if err != nil {
-		return fmt.Errorf("%w: couldn't create file(name=%s)", err, filename)
-	}
-	if _, err := f.Write(b); err != nil {
-		if err := os.Remove(filename); err != nil {
-			return fmt.Errorf("%w: couldn't remove file(name=%s)", err, filename)
-		}
+	if err := os.WriteFile(filename, b, 0o600); err != nil {
 		return fmt.Errorf("%w: couldn't write file(name=%s)", err, filename)
 	}
 	return nil

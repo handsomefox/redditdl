@@ -13,55 +13,35 @@ type Content struct {
 // Everything below mimics reddit's responses.
 
 type Posts struct {
-	Kind string    `json:"kind"`
-	Data PostsData `json:"data"`
-}
-
-type PostsData struct {
-	After    string  `json:"after"`
-	Children []Child `json:"children"`
+	Data struct {
+		After    string  `json:"after"`
+		Children []Child `json:"children"`
+	} `json:"data"`
 }
 
 type Child struct {
-	Kind string    `json:"kind"`
-	Data ChildData `json:"data"`
-}
-
-type ChildData struct {
-	Title     string  `json:"title"`
-	Thumbnail string  `json:"thumbnail"`
-	Preview   Preview `json:"preview"`
-	Media     struct {
-		RedditVideo Video `json:"reddit_video"`
-	} `json:"media"`
-	IsVideo bool `json:"is_video"`
+	Data struct {
+		Media struct {
+			RedditVideo *Video `json:"reddit_video"`
+		} `json:"media"`
+		Title   string `json:"title"`
+		Preview struct {
+			Images []struct {
+				Source *ImageData `json:"source"`
+			} `json:"images"`
+		}
+		IsVideo bool `json:"is_video"`
+	} `json:"data"`
 }
 
 type Video struct {
-	FallbackURL       string `json:"fallback_url"`
-	TranscodingStatus string `json:"transcoding_status"`
-	ScrubberMediaURL  string `json:"scrubber_media_url"`
-	DashURL           string `json:"dash_url"`
-	HlsURL            string `json:"hls_url"`
-	BitrateKbps       int    `json:"bitrate_kbps"`
-	Height            int    `json:"height"`
-	Duration          int    `json:"duration"`
-	Width             int    `json:"width"`
-	IsGif             bool   `json:"is_gif"`
+	ScrubberMediaURL string `json:"scrubber_media_url"`
+	Height           int    `json:"height"`
+	Width            int    `json:"width"`
 }
 
 type ImageData struct {
 	URL    string `json:"url"`
-	Width  int    `json:"width"`
 	Height int    `json:"height"`
-}
-
-type Preview struct {
-	Images []Image `json:"images"`
-}
-
-type Image struct {
-	ID          string      `json:"id"`
-	Resolutions []ImageData `json:"resolutions"`
-	Source      ImageData   `json:"source"`
+	Width  int    `json:"width"`
 }
