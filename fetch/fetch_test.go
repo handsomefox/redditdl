@@ -6,7 +6,7 @@ import (
 	"github.com/handsomefox/redditdl/fetch"
 )
 
-func TestIsURL(t *testing.T) {
+func TestIsValidURL(t *testing.T) {
 	t.Parallel()
 	type args struct {
 		str string
@@ -63,7 +63,7 @@ func TestIsURL(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			if got := fetch.IsURL(tt.args.str); got != tt.want {
+			if got := fetch.IsValidURL(tt.args.str); got != tt.want {
 				t.Errorf("IsURL() = %v, want %v", got, tt.want)
 			}
 		})

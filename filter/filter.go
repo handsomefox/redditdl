@@ -56,7 +56,7 @@ func WidthHeight() DeciderFunc {
 // URLs is a filter that filters out invalid URLs.
 func URLs() DeciderFunc {
 	return func(item api.Content, cfg *configuration.Config) bool {
-		if len(item.URL) > 0 && fetch.IsURL(item.URL) {
+		if len(item.URL) > 0 && fetch.IsValidURL(item.URL) {
 			return false
 		}
 		return true

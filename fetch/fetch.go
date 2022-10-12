@@ -37,8 +37,7 @@ func NewClient() *http.Client {
 	}
 }
 
-// IsURL checks if the URL is valid.
-func IsURL(str string) bool {
+func IsValidURL(str string) bool {
 	u, err := url.ParseRequestURI(str)
 	return err == nil && u.Host != "" && u.Scheme != ""
 }
