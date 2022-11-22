@@ -17,34 +17,26 @@ import (
 	"go.uber.org/zap"
 )
 
-// Downloader is a single-method interface which takes in configuration and a list of filters
-// and returns statistics after it is done downloading all the files.
-type Downloader interface {
-	Download() Stats
-}
-
 // New returns a new Downloader instance with the specified configuration.
-func New(cfg *config.Config, fs ...filters.Filter) Downloader {
-	return &downloader{
-		Config:  cfg,
-		Logger:  logging.Get(cfg.Verbose),
-		Stats:   &stats{},
-		Filters: fs,
+func New(cfg *config.Config, fs ...filters.Filter) *Downloader {
+	return &Downloader{
+		cfg:    cfg,
+		logger: logging.Get(cfg.Verbose),
+		stats:  &collectedStats{},
+		fs:     fs,
 	}
 }
 
-var _ Downloader = &downloader{}
-
-type downloader struct {
-	Config  *config.Config
-	Logger  *zap.SugaredLogger
-	Stats   *stats
-	Filters []filters.Filter
+type Downloader struct {
+	cfg    *config.Config
+	logger *zap.SugaredLogger
+	stats  *collectedStats
+	fs     []filters.Filter
 }
 
 // Download downloads the files using the given parameters to downloader in
 // a concurrent fashion to maximize download speeds.
-func (dl *downloader) Download() Stats {
+func (dl *Downloader) Download() *Stats {
 	var (
 		contentChan = make(chan *models.Content)
 		filesChan   = make(chan *files.File)
@@ -55,141 +47,141 @@ func (dl *downloader) Download() Stats {
 	go func(c chan<- *models.Content) {
 		defer wg.Done()
 		defer close(c)
-		dl.FetchPosts(c)
+		dl.fetchPosts(c)
 	}(contentChan)
 	// Downloading posts from the content channel and storing data in files channel.
 	wg.Add(1)
 	go func(f chan<- *files.File, c <-chan *models.Content) {
 		defer wg.Done()
 		defer close(f)
-		dl.DownloadRoutine(f, c)
+		dl.downloadRoutine(f, c)
 	}(filesChan, contentChan)
 	// Saving data from files channel to disk.
 	wg.Add(1)
 	go func(f <-chan *files.File) {
 		defer wg.Done()
-		dl.SaveFiles(f)
+		dl.saveFiles(f)
 	}(filesChan)
 
-	exitChan := make(chan bool)
-	if dl.Config.ShowProgress {
-		go dl.ShowProgress(exitChan)
+	exitChan := make(chan struct{})
+	if dl.cfg.ShowProgress {
+		go dl.showProgress(exitChan)
 	}
 
 	wg.Wait()
 
-	if dl.Config.ShowProgress {
-		exitChan <- true
+	if dl.cfg.ShowProgress {
+		exitChan <- struct{}{}
 	}
 	close(exitChan)
-	return dl.Stats
+	return &Stats{st: dl.stats}
 }
 
-// FetchPosts is fetching, filtering and sending posts to outChan.
-func (dl *downloader) FetchPosts(contentChan chan<- *models.Content) {
+// fetchPosts is fetching, filtering and sending posts to outChan.
+func (dl *Downloader) fetchPosts(contentChan chan<- *models.Content) {
 	var (
 		count int64
 		after string
 	)
-	for count < dl.Config.Count {
-		url := fetch.FormatURL(dl.Config, after)
-		dl.Logger.Debugf("Fetching posts from: %s", url)
+	for count < dl.cfg.Count {
+		url := fetch.FormatURL(dl.cfg, after)
+		dl.logger.Debugf("Fetching posts from: %s", url)
 
 		posts, err := fetch.Posts(url)
 		if err != nil {
-			dl.Stats.append(newFetchError(err, url))
+			dl.stats.append(newFetchError(err, url))
 			continue
 		}
 
-		dl.Logger.Debug("Converting response")
-		content := postsToContent(dl.Config.ContentType, posts.Data.Children)
+		dl.logger.Debug("Converting response")
+		content := postsToContent(dl.cfg.ContentType, posts.Data.Children)
 
-		dl.Logger.Debug("Filtering posts")
+		dl.logger.Debug("Filtering posts")
 		for _, c := range content {
 			c := c
-			if count == dl.Config.Count {
+			if count == dl.cfg.Count {
 				break
 			}
-			if filters.IsFiltered(dl.Config, c, dl.Filters...) {
+			if filters.IsFiltered(dl.cfg, c, dl.fs...) {
 				continue
 			}
-			dl.Stats.queued.Add(1)
+			dl.stats.queued.Add(1)
 			count++
 			contentChan <- &c
 		}
 		// another check prevents us from going to sleep for SleepTime if we have enough links.
-		if count == dl.Config.Count {
+		if count == dl.cfg.Count {
 			break
 		}
 		if len(posts.Data.Children) == 0 || posts.Data.After == after || posts.Data.After == "" {
-			dl.Logger.Info("There's no more posts to fetch")
+			dl.logger.Info("There's no more posts to fetch")
 			break
 		}
 
 		after = posts.Data.After
 
-		dl.Logger.Debugf("Fetch is sleeping...")
-		time.Sleep(dl.Config.SleepTime)
+		dl.logger.Debugf("Fetch is sleeping...")
+		time.Sleep(dl.cfg.SleepTime)
 	}
 }
 
-// DownloadRoutine is downloading the files from content chan to files chan using multiple goroutines.
-func (dl *downloader) DownloadRoutine(fileChan chan<- *files.File, contentChan <-chan *models.Content) {
+// downloadRoutine is downloading the files from content chan to files chan using multiple goroutines.
+func (dl *Downloader) downloadRoutine(fileChan chan<- *files.File, contentChan <-chan *models.Content) {
 	wg := &sync.WaitGroup{}
-	for i := 0; i < dl.Config.WorkerCount; i++ {
+	for i := 0; i < dl.cfg.WorkerCount; i++ {
 		wg.Add(1)
 		go func(f chan<- *files.File, c <-chan *models.Content) {
 			defer wg.Done()
-			dl.DownloadFiles(f, c)
+			dl.downloadFiles(f, c)
 		}(fileChan, contentChan)
 	}
 	wg.Wait()
 }
 
-// DownloadFiles gets files from the inChan, fetches their data and stores it in outChan.
-func (dl *downloader) DownloadFiles(fileChan chan<- *files.File, contentChan <-chan *models.Content) {
+// downloadFiles gets files from the inChan, fetches their data and stores it in outChan.
+func (dl *Downloader) downloadFiles(fileChan chan<- *files.File, contentChan <-chan *models.Content) {
 	for content := range contentChan {
 		file, err := fetch.File(content)
 		if err != nil {
-			dl.Stats.append(newFetchError(err, content.URL))
+			dl.stats.append(newFetchError(err, content.URL))
 			continue
 		}
 		fileChan <- file
 	}
 }
 
-// SaveFiles gets data from filesChan and stores it on disk.
-func (dl *downloader) SaveFiles(filesChan <-chan *files.File) {
-	if err := files.NavigateTo(dl.Config.Directory, true); err != nil {
-		dl.Stats.failed.Store(dl.Stats.queued.Load())
-		dl.Stats.append(fmt.Errorf("%w: failed to navigate to directory %s", err, dl.Config.Directory))
+// saveFiles gets data from filesChan and stores it on disk.
+func (dl *Downloader) saveFiles(filesChan <-chan *files.File) {
+	if err := files.NavigateTo(dl.cfg.Directory, true); err != nil {
+		dl.stats.failed.Store(dl.stats.queued.Load())
+		dl.stats.append(fmt.Errorf("%w: failed to navigate to directory %s", err, dl.cfg.Directory))
 		return
 	}
 	for file := range filesChan {
 		filename, err := files.NewFilename(file.Name, file.Extension)
 		if err != nil {
-			dl.Logger.Debugf("%s: failed to save file", err)
-			dl.Stats.appendIncr(newDownloadError(err, filename))
+			dl.logger.Debugf("%s: failed to save file", err)
+			dl.stats.appendIncr(newDownloadError(err, filename))
 			continue
 		}
 		if err := files.Save(filename, file.Data); err != nil {
-			dl.Stats.appendIncr(newDownloadError(err, filename))
+			dl.stats.appendIncr(newDownloadError(err, filename))
 			continue
 		}
-		dl.Stats.finished.Add(1)
-		dl.Logger.Debugf("saved file: %s", file.Name)
+		dl.stats.finished.Add(1)
+		dl.logger.Debugf("saved file: %s", file.Name)
 	}
 }
 
-// ShowProgress prints the current progress of download every two seconds.
-func (dl *downloader) ShowProgress(exit <-chan bool) {
+// showProgress prints the current progress of download every two seconds.
+func (dl *Downloader) showProgress(exit <-chan struct{}) {
 	fStr := "Current progress: queued=%d, finished=%d, failed=%d"
 	for {
 		select {
 		case <-exit:
 			return
 		default:
-			dl.Logger.Infof(fStr, dl.Stats.queued.Load(), dl.Stats.finished.Load(), dl.Stats.failed.Load())
+			dl.logger.Infof(fStr, dl.stats.queued.Load(), dl.stats.finished.Load(), dl.stats.failed.Load())
 			time.Sleep(time.Second)
 		}
 	}
