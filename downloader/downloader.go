@@ -48,9 +48,9 @@ func (dl *downloader) Download() Stats {
 	var (
 		contentChan = make(chan *api.Content)
 		filesChan   = make(chan *files.File)
-		wg          sync.WaitGroup
 	)
 	// Fetching posts to the content channel for further download.
+	wg := &sync.WaitGroup{}
 	wg.Add(1)
 	go func(c chan<- *api.Content) {
 		defer wg.Done()
@@ -135,7 +135,7 @@ func (dl *downloader) FetchPosts(contentChan chan<- *api.Content) {
 
 // DownloadRoutine is downloading the files from content chan to files chan using multiple goroutines.
 func (dl *downloader) DownloadRoutine(fileChan chan<- *files.File, contentChan <-chan *api.Content) {
-	var wg sync.WaitGroup
+	wg := &sync.WaitGroup{}
 	for i := 0; i < dl.Config.WorkerCount; i++ {
 		wg.Add(1)
 		go func(f chan<- *files.File, c <-chan *api.Content) {
