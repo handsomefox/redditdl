@@ -5,7 +5,7 @@ import (
 	"path"
 	"testing"
 
-	"github.com/handsomefox/redditdl/files"
+	"github.com/handsomefox/redditdl/pkg/files"
 )
 
 func TestNewFilename(t *testing.T) {

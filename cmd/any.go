@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"github.com/handsomefox/redditdl/downloader/config"
+	"github.com/handsomefox/redditdl/pkg/downloader/config"
 	"github.com/spf13/cobra"
 )
 

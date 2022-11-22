@@ -8,12 +8,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/handsomefox/redditdl/downloader/config"
-	"github.com/handsomefox/redditdl/downloader/filters"
-	"github.com/handsomefox/redditdl/downloader/models"
-	"github.com/handsomefox/redditdl/downloader/models/fetch"
-	"github.com/handsomefox/redditdl/files"
-	"github.com/handsomefox/redditdl/logging"
+	"github.com/handsomefox/redditdl/pkg/downloader/config"
+	"github.com/handsomefox/redditdl/pkg/downloader/filters"
+	"github.com/handsomefox/redditdl/pkg/downloader/models"
+	"github.com/handsomefox/redditdl/pkg/downloader/models/fetch"
+	"github.com/handsomefox/redditdl/pkg/files"
+	"github.com/handsomefox/redditdl/pkg/logging"
 	"go.uber.org/zap"
 )
 

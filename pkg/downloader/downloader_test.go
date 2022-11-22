@@ -6,9 +6,9 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/handsomefox/redditdl/downloader"
-	"github.com/handsomefox/redditdl/downloader/config"
-	"github.com/handsomefox/redditdl/downloader/filters"
+	"github.com/handsomefox/redditdl/pkg/downloader"
+	"github.com/handsomefox/redditdl/pkg/downloader/config"
+	"github.com/handsomefox/redditdl/pkg/downloader/filters"
 )
 
 func TestDownload(t *testing.T) {

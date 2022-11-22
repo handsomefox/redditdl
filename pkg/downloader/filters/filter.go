@@ -5,9 +5,9 @@
 package filters
 
 import (
-	"github.com/handsomefox/redditdl/downloader/config"
-	"github.com/handsomefox/redditdl/downloader/models"
-	"github.com/handsomefox/redditdl/downloader/models/fetch"
+	"github.com/handsomefox/redditdl/pkg/downloader/config"
+	"github.com/handsomefox/redditdl/pkg/downloader/models"
+	"github.com/handsomefox/redditdl/pkg/downloader/models/fetch"
 )
 
 // Default returns a slice of the filters included in this package.

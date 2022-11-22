@@ -14,9 +14,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/handsomefox/redditdl/downloader/config"
-	"github.com/handsomefox/redditdl/downloader/models"
-	"github.com/handsomefox/redditdl/files"
+	"github.com/handsomefox/redditdl/pkg/downloader/config"
+	"github.com/handsomefox/redditdl/pkg/downloader/models"
+	"github.com/handsomefox/redditdl/pkg/files"
 )
 
 const (
