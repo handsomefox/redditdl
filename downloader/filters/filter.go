@@ -6,8 +6,8 @@ package filters
 
 import (
 	"github.com/handsomefox/redditdl/downloader/config"
-	"github.com/handsomefox/redditdl/downloader/fetch"
-	"github.com/handsomefox/redditdl/downloader/fetch/api"
+	"github.com/handsomefox/redditdl/downloader/models"
+	"github.com/handsomefox/redditdl/downloader/models/fetch"
 )
 
 // Default returns a slice of the filters included in this package.
@@ -21,7 +21,7 @@ func Default() []Filter {
 
 // IsFiltered returns a boolean that indicates whether applying filters to the given item
 // indicate that the item is unwanted.
-func IsFiltered(cfg *config.Config, item api.Content, fs ...Filter) bool {
+func IsFiltered(cfg *config.Config, item models.Content, fs ...Filter) bool {
 	for _, f := range fs {
 		if filtered := f.Filters(item, cfg); filtered {
 			return true
@@ -33,20 +33,20 @@ func IsFiltered(cfg *config.Config, item api.Content, fs ...Filter) bool {
 // Filter is an interface that filters the given item and returns the result of filtering (true/false).
 type Filter interface {
 	// Filters returns whether the item should be filtered out.
-	Filters(api.Content, *config.Config) bool
+	Filters(models.Content, *config.Config) bool
 }
 
 // DeciderFunc implements filter interface and expects the function to return a boolean.
-type DeciderFunc func(api.Content, *config.Config) bool
+type DeciderFunc func(models.Content, *config.Config) bool
 
 // Filters is the implementation of Filter interface.
-func (fn DeciderFunc) Filters(c api.Content, d *config.Config) bool {
+func (fn DeciderFunc) Filters(c models.Content, d *config.Config) bool {
 	return fn(c, d)
 }
 
 // WidthHeight is a filter that filters images by specified width and height from settings.
 func WidthHeight() DeciderFunc {
-	return func(item api.Content, cfg *config.Config) bool {
+	return func(item models.Content, cfg *config.Config) bool {
 		if item.Width >= cfg.MinWidth && item.Height >= cfg.MinHeight {
 			return false
 		}
@@ -56,7 +56,7 @@ func WidthHeight() DeciderFunc {
 
 // URLs is a filter that filters out invalid URLs.
 func URLs() DeciderFunc {
-	return func(item api.Content, cfg *config.Config) bool {
+	return func(item models.Content, cfg *config.Config) bool {
 		if len(item.URL) > 0 && fetch.IsValidURL(item.URL) {
 			return false
 		}
@@ -66,7 +66,7 @@ func URLs() DeciderFunc {
 
 // Orientation is a filter that filters images by specified orientation.
 func Orientation() DeciderFunc {
-	return func(item api.Content, cfg *config.Config) bool {
+	return func(item models.Content, cfg *config.Config) bool {
 		if cfg.Orientation == "" || len(cfg.Orientation) > 1 {
 			return false
 		}

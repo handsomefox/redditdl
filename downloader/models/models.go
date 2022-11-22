@@ -1,5 +1,5 @@
 // Package api is a package containing data structures that mimic reddit.com responses.
-package api
+package models
 
 // Content contains information which is required to filter by resolution,
 // Content and store a video or an image.

@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/handsomefox/redditdl/downloader/config"
-	"github.com/handsomefox/redditdl/downloader/fetch/api"
+	"github.com/handsomefox/redditdl/downloader/models"
 	"github.com/handsomefox/redditdl/files"
 )
 
@@ -72,7 +72,7 @@ func FormatURL(cfg *config.Config, after string) string {
 }
 
 // File fetches data for a file from reddit's api and returns a *File.
-func File(content *api.Content) (*files.File, error) {
+func File(content *models.Content) (*files.File, error) {
 	request, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, content.URL, http.NoBody)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s", err, "couldn't create the request")
@@ -110,7 +110,7 @@ func File(content *api.Content) (*files.File, error) {
 
 // Posts fetches a json file from reddit containing information
 // about the posts using the given configuration.
-func Posts(path string) (*api.Posts, error) {
+func Posts(path string) (*models.Posts, error) {
 	request, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, path, http.NoBody)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s", err, "couldn't create the request")
@@ -127,7 +127,7 @@ func Posts(path string) (*api.Posts, error) {
 		return nil, fmt.Errorf("%w: %s", ErrInvalidStatus, http.StatusText(response.StatusCode))
 	}
 
-	posts := &api.Posts{}
+	posts := &models.Posts{}
 	if err := json.NewDecoder(response.Body).Decode(posts); err != nil {
 		return nil, fmt.Errorf("%w: %s", err, "couldn't decode posts")
 	}

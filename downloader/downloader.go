@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/handsomefox/redditdl/downloader/config"
-	"github.com/handsomefox/redditdl/downloader/fetch"
-	"github.com/handsomefox/redditdl/downloader/fetch/api"
 	"github.com/handsomefox/redditdl/downloader/filters"
+	"github.com/handsomefox/redditdl/downloader/models"
+	"github.com/handsomefox/redditdl/downloader/models/fetch"
 	"github.com/handsomefox/redditdl/files"
 	"github.com/handsomefox/redditdl/logging"
 	"go.uber.org/zap"
@@ -46,20 +46,20 @@ type downloader struct {
 // a concurrent fashion to maximize download speeds.
 func (dl *downloader) Download() Stats {
 	var (
-		contentChan = make(chan *api.Content)
+		contentChan = make(chan *models.Content)
 		filesChan   = make(chan *files.File)
 	)
 	// Fetching posts to the content channel for further download.
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
-	go func(c chan<- *api.Content) {
+	go func(c chan<- *models.Content) {
 		defer wg.Done()
 		defer close(c)
 		dl.FetchPosts(c)
 	}(contentChan)
 	// Downloading posts from the content channel and storing data in files channel.
 	wg.Add(1)
-	go func(f chan<- *files.File, c <-chan *api.Content) {
+	go func(f chan<- *files.File, c <-chan *models.Content) {
 		defer wg.Done()
 		defer close(f)
 		dl.DownloadRoutine(f, c)
@@ -86,7 +86,7 @@ func (dl *downloader) Download() Stats {
 }
 
 // FetchPosts is fetching, filtering and sending posts to outChan.
-func (dl *downloader) FetchPosts(contentChan chan<- *api.Content) {
+func (dl *downloader) FetchPosts(contentChan chan<- *models.Content) {
 	var (
 		count int64
 		after string
@@ -134,11 +134,11 @@ func (dl *downloader) FetchPosts(contentChan chan<- *api.Content) {
 }
 
 // DownloadRoutine is downloading the files from content chan to files chan using multiple goroutines.
-func (dl *downloader) DownloadRoutine(fileChan chan<- *files.File, contentChan <-chan *api.Content) {
+func (dl *downloader) DownloadRoutine(fileChan chan<- *files.File, contentChan <-chan *models.Content) {
 	wg := &sync.WaitGroup{}
 	for i := 0; i < dl.Config.WorkerCount; i++ {
 		wg.Add(1)
-		go func(f chan<- *files.File, c <-chan *api.Content) {
+		go func(f chan<- *files.File, c <-chan *models.Content) {
 			defer wg.Done()
 			dl.DownloadFiles(f, c)
 		}(fileChan, contentChan)
@@ -147,7 +147,7 @@ func (dl *downloader) DownloadRoutine(fileChan chan<- *files.File, contentChan <
 }
 
 // DownloadFiles gets files from the inChan, fetches their data and stores it in outChan.
-func (dl *downloader) DownloadFiles(fileChan chan<- *files.File, contentChan <-chan *api.Content) {
+func (dl *downloader) DownloadFiles(fileChan chan<- *files.File, contentChan <-chan *models.Content) {
 	for content := range contentChan {
 		file, err := fetch.File(content)
 		if err != nil {
@@ -196,8 +196,8 @@ func (dl *downloader) ShowProgress(exit <-chan bool) {
 }
 
 // Converts posts to content depending on the configuration, leaving only the required types of media in.
-func postsToContent(typ config.ContentType, children []api.Child) []api.Content {
-	data := make([]api.Content, 0, len(children))
+func postsToContent(typ config.ContentType, children []models.Child) []models.Content {
+	data := make([]models.Content, 0, len(children))
 	for i := 0; i < len(children); i++ {
 		v := &children[i].Data
 		if !v.IsVideo && (typ == config.ContentAny || typ == config.ContentImages) {
@@ -205,7 +205,7 @@ func postsToContent(typ config.ContentType, children []api.Child) []api.Content 
 				continue
 			}
 			img := &v.Preview.Images[0]
-			data = append(data, api.Content{
+			data = append(data, models.Content{
 				Name:    v.Title,
 				URL:     strings.ReplaceAll(img.Source.URL, "&amp;s", "&s"),
 				Width:   img.Source.Width,
@@ -213,7 +213,7 @@ func postsToContent(typ config.ContentType, children []api.Child) []api.Content 
 				IsVideo: false,
 			})
 		} else if v.IsVideo && (typ == config.ContentAny || typ == config.ContentVideos) {
-			data = append(data, api.Content{
+			data = append(data, models.Content{
 				Name:    v.Title,
 				URL:     strings.ReplaceAll(v.Media.RedditVideo.ScrubberMediaURL, "&amp;s", "&s"),
 				Width:   v.Media.RedditVideo.Width,
