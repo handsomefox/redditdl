@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"github.com/handsomefox/redditdl/downloader/configuration"
+	"github.com/handsomefox/redditdl/downloader/config"
 	"github.com/spf13/cobra"
 )
 
@@ -14,7 +14,7 @@ filters to the content which will be downloaded.
 `,
 	Run: func(cmd *cobra.Command, args []string) {
 		settings := GetSettings(cmd)
-		settings.ContentType = configuration.ContentVideos
+		settings.ContentType = config.ContentVideos
 		RunCommand(&settings)
 	},
 }

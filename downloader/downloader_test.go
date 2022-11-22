@@ -7,14 +7,14 @@ import (
 	"testing"
 
 	"github.com/handsomefox/redditdl/downloader"
-	"github.com/handsomefox/redditdl/downloader/configuration"
+	"github.com/handsomefox/redditdl/downloader/config"
 	"github.com/handsomefox/redditdl/downloader/filters"
 )
 
 func TestDownload(t *testing.T) {
 	t.Parallel()
 
-	cfg := configuration.Config{
+	cfg := config.Config{
 		Directory:    os.TempDir(),
 		Subreddit:    "wallpaper",
 		Sorting:      "best",
@@ -23,11 +23,11 @@ func TestDownload(t *testing.T) {
 		Count:        25,
 		MinWidth:     0,
 		MinHeight:    0,
-		WorkerCount:  configuration.DefaultWorkerCount,
-		SleepTime:    configuration.DefaultSleepTime,
+		WorkerCount:  config.DefaultWorkerCount,
+		SleepTime:    config.DefaultSleepTime,
 		Verbose:      true,
 		ShowProgress: true,
-		ContentType:  configuration.ContentAny,
+		ContentType:  config.ContentAny,
 	}
 
 	client := downloader.New(&cfg, filters.Default()...)
@@ -41,8 +41,8 @@ func TestDownload(t *testing.T) {
 	}
 }
 
-func setupConfig(count int64) configuration.Config {
-	return configuration.Config{
+func setupConfig(count int64) config.Config {
+	return config.Config{
 		Directory:    strconv.Itoa(int(count)),
 		Subreddit:    "wallpaper",
 		Sorting:      "best",
@@ -51,11 +51,11 @@ func setupConfig(count int64) configuration.Config {
 		Count:        count,
 		MinWidth:     0,
 		MinHeight:    0,
-		WorkerCount:  configuration.DefaultWorkerCount,
-		SleepTime:    configuration.DefaultSleepTime,
+		WorkerCount:  config.DefaultWorkerCount,
+		SleepTime:    config.DefaultSleepTime,
 		Verbose:      false,
 		ShowProgress: false,
-		ContentType:  configuration.ContentImages,
+		ContentType:  config.ContentImages,
 	}
 }
 

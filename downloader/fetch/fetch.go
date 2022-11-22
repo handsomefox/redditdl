@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/handsomefox/redditdl/downloader/configuration"
+	"github.com/handsomefox/redditdl/downloader/config"
 	"github.com/handsomefox/redditdl/downloader/fetch/api"
 	"github.com/handsomefox/redditdl/files"
 )
@@ -63,7 +63,7 @@ func IsValidURL(str string) bool {
 const fStr = "https://www.reddit.com/r/%s/%s.json?limit=%d&t=%s"
 
 // FormatURL formats the URL using the configuration.
-func FormatURL(cfg *configuration.Config, after string) string {
+func FormatURL(cfg *config.Config, after string) string {
 	URL := fmt.Sprintf(fStr, cfg.Subreddit, cfg.Sorting, cfg.Count, cfg.Timeframe)
 	if len(after) > 0 {
 		URL = fmt.Sprintf("%s&after=%s&count=%d", URL, after, cfg.Count)

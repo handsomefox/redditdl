@@ -1,6 +1,6 @@
 // Package configuration is a package that has data structures
 // that describe the settings that can be applied to a downloader.
-package configuration
+package config
 
 import "time"
 

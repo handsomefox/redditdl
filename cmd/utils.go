@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"github.com/handsomefox/redditdl/downloader"
-	"github.com/handsomefox/redditdl/downloader/configuration"
+	"github.com/handsomefox/redditdl/downloader/config"
 	"github.com/handsomefox/redditdl/downloader/filters"
 	"github.com/handsomefox/redditdl/logging"
 	"github.com/spf13/cobra"
@@ -25,7 +25,7 @@ func assert(err error) {
 	}
 }
 
-func GetSettings(cmd *cobra.Command) configuration.Config {
+func GetSettings(cmd *cobra.Command) config.Config {
 	flags := cmd.Flags()
 
 	directory, err := flags.GetString("dir")
@@ -49,7 +49,7 @@ func GetSettings(cmd *cobra.Command) configuration.Config {
 	progress, err := flags.GetBool("progress")
 	assert(err)
 
-	return configuration.Config{
+	return config.Config{
 		Directory:    directory,
 		Subreddit:    subreddit,
 		Sorting:      sorting,
@@ -58,15 +58,15 @@ func GetSettings(cmd *cobra.Command) configuration.Config {
 		Count:        count,
 		MinWidth:     width,
 		MinHeight:    height,
-		WorkerCount:  configuration.DefaultWorkerCount,
-		SleepTime:    configuration.DefaultSleepTime,
+		WorkerCount:  config.DefaultWorkerCount,
+		SleepTime:    config.DefaultSleepTime,
 		Verbose:      verbose,
 		ShowProgress: progress,
-		ContentType:  configuration.ContentAny,
+		ContentType:  config.ContentAny,
 	}
 }
 
-func RunCommand(cfg *configuration.Config) {
+func RunCommand(cfg *config.Config) {
 	log := logging.Get(cfg.Verbose)
 
 	// Print the configuration
@@ -87,11 +87,11 @@ func RunCommand(cfg *configuration.Config) {
 
 	fStr := "Finished downloading %d "
 	switch cfg.ContentType {
-	case configuration.ContentAny:
+	case config.ContentAny:
 		fStr += "image(s)/video(s)"
-	case configuration.ContentImages:
+	case config.ContentImages:
 		fStr += "image(s)"
-	case configuration.ContentVideos:
+	case config.ContentVideos:
 		fStr += "video(s)"
 	}
 

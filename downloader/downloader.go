@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/handsomefox/redditdl/downloader/configuration"
+	"github.com/handsomefox/redditdl/downloader/config"
 	"github.com/handsomefox/redditdl/downloader/fetch"
 	"github.com/handsomefox/redditdl/downloader/fetch/api"
 	"github.com/handsomefox/redditdl/downloader/filters"
@@ -24,10 +24,10 @@ type Downloader interface {
 }
 
 // New returns a new Downloader instance with the specified configuration.
-func New(config *configuration.Config, fs ...filters.Filter) Downloader {
+func New(cfg *config.Config, fs ...filters.Filter) Downloader {
 	return &downloader{
-		Config:  config,
-		Logger:  logging.Get(config.Verbose),
+		Config:  cfg,
+		Logger:  logging.Get(cfg.Verbose),
 		Stats:   &stats{},
 		Filters: fs,
 	}
@@ -36,7 +36,7 @@ func New(config *configuration.Config, fs ...filters.Filter) Downloader {
 var _ Downloader = &downloader{}
 
 type downloader struct {
-	Config  *configuration.Config
+	Config  *config.Config
 	Logger  *zap.SugaredLogger
 	Stats   *stats
 	Filters []filters.Filter
@@ -196,11 +196,11 @@ func (dl *downloader) ShowProgress(exit <-chan bool) {
 }
 
 // Converts posts to content depending on the configuration, leaving only the required types of media in.
-func postsToContent(typ configuration.ContentType, children []api.Child) []api.Content {
+func postsToContent(typ config.ContentType, children []api.Child) []api.Content {
 	data := make([]api.Content, 0, len(children))
 	for i := 0; i < len(children); i++ {
 		v := &children[i].Data
-		if !v.IsVideo && (typ == configuration.ContentAny || typ == configuration.ContentImages) {
+		if !v.IsVideo && (typ == config.ContentAny || typ == config.ContentImages) {
 			if len(v.Preview.Images) != 1 {
 				continue
 			}
@@ -212,7 +212,7 @@ func postsToContent(typ configuration.ContentType, children []api.Child) []api.C
 				Height:  img.Source.Height,
 				IsVideo: false,
 			})
-		} else if v.IsVideo && (typ == configuration.ContentAny || typ == configuration.ContentVideos) {
+		} else if v.IsVideo && (typ == config.ContentAny || typ == config.ContentVideos) {
 			data = append(data, api.Content{
 				Name:    v.Title,
 				URL:     strings.ReplaceAll(v.Media.RedditVideo.ScrubberMediaURL, "&amp;s", "&s"),
