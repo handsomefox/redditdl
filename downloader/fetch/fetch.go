@@ -14,8 +14,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/handsomefox/redditdl/configuration"
-	"github.com/handsomefox/redditdl/fetch/api"
+	"github.com/handsomefox/redditdl/downloader/configuration"
+	"github.com/handsomefox/redditdl/downloader/fetch/api"
 	"github.com/handsomefox/redditdl/files"
 )
 

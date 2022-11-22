@@ -8,11 +8,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/handsomefox/redditdl/configuration"
-	"github.com/handsomefox/redditdl/fetch"
-	"github.com/handsomefox/redditdl/fetch/api"
+	"github.com/handsomefox/redditdl/downloader/configuration"
+	"github.com/handsomefox/redditdl/downloader/fetch"
+	"github.com/handsomefox/redditdl/downloader/fetch/api"
+	"github.com/handsomefox/redditdl/downloader/filter"
 	"github.com/handsomefox/redditdl/files"
-	"github.com/handsomefox/redditdl/filter"
 	"github.com/handsomefox/redditdl/logging"
 	"go.uber.org/zap"
 )

@@ -3,7 +3,7 @@ package fetch_test
 import (
 	"testing"
 
-	"github.com/handsomefox/redditdl/fetch"
+	"github.com/handsomefox/redditdl/downloader/fetch"
 )
 
 func TestIsValidURL(t *testing.T) {

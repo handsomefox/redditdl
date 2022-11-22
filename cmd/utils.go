@@ -1,9 +1,9 @@
 package cmd
 
 import (
-	"github.com/handsomefox/redditdl/configuration"
 	"github.com/handsomefox/redditdl/downloader"
-	"github.com/handsomefox/redditdl/filter"
+	"github.com/handsomefox/redditdl/downloader/configuration"
+	"github.com/handsomefox/redditdl/downloader/filter"
 	"github.com/handsomefox/redditdl/logging"
 	"github.com/spf13/cobra"
 )
