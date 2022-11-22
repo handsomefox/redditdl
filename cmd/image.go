@@ -12,7 +12,7 @@ var imageCmd = &cobra.Command{
 different subreddits from reddit.com, applying different
 filters to the content which will be downloaded.
 `,
-	Run: func(cmd *cobra.Command, args []string) {
+	Run: func(cmd *cobra.Command, _ []string) {
 		settings := GetSettings(cmd)
 		settings.ContentType = config.ContentImages
 		RunCommand(&settings)
