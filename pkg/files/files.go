@@ -84,12 +84,12 @@ func format(filename, extension string) (string, error) {
 }
 
 // Most of the characters are forbidden on Windows only.
-var forbiddenChars = []string{"/", "<", ">", ":", "\"", "\\", "|", "?", "*"}
+const forbiddenChars = "/<>:\\|?*"
 
 // removeForbiddenChars removes invalid characters for Linux/Windows filenames.
 func removeForbiddenChars(name string) string {
 	for _, c := range forbiddenChars {
-		name = strings.ReplaceAll(name, c, "")
+		name = strings.ReplaceAll(name, string(c), "")
 	}
 	return name
 }
