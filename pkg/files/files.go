@@ -84,7 +84,7 @@ func format(filename, extension string) (string, error) {
 }
 
 // Most of the characters are forbidden on Windows only.
-const forbiddenChars = "/<>:\\|?*"
+const forbiddenChars = "/<>\":\\|?*"
 
 // removeForbiddenChars removes invalid characters for Linux/Windows filenames.
 func removeForbiddenChars(name string) string {
