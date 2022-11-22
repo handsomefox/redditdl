@@ -25,10 +25,6 @@ const (
 	clientTimeout = time.Minute
 )
 
-// client  is the global client used in package fetch to do requests.
-// This is safe, and also better than using a client per request.
-var client = NewClient()
-
 // ErrInvalidStatus is an error returned by package fetch
 // in cases when the response status code was not expected.
 var ErrInvalidStatus = errors.New("unexpected status code in response")
@@ -59,7 +55,7 @@ func IsValidURL(str string) bool {
 	return err == nil && u.Host != "" && u.Scheme != ""
 }
 
-// fStr is the expected format for the request URL to reddit.com
+// fStr is the expected format for the request URL to reddit.com.
 const fStr = "https://www.reddit.com/r/%s/%s.json?limit=%d&t=%s"
 
 // FormatURL formats the URL using the configuration.
@@ -73,6 +69,7 @@ func FormatURL(cfg *config.Config, after string) string {
 
 // File fetches data for a file from reddit's api and returns a *File.
 func File(content *models.Content) (*files.File, error) {
+	client := NewClient()
 	request, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, content.URL, http.NoBody)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s", err, "couldn't create the request")
@@ -111,6 +108,7 @@ func File(content *models.Content) (*files.File, error) {
 // Posts fetches a json file from reddit containing information
 // about the posts using the given configuration.
 func Posts(path string) (*models.Posts, error) {
+	client := NewClient()
 	request, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, path, http.NoBody)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s", err, "couldn't create the request")
