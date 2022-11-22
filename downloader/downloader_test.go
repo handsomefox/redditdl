@@ -8,7 +8,7 @@ import (
 
 	"github.com/handsomefox/redditdl/downloader"
 	"github.com/handsomefox/redditdl/downloader/configuration"
-	"github.com/handsomefox/redditdl/downloader/filter"
+	"github.com/handsomefox/redditdl/downloader/filters"
 )
 
 func TestDownload(t *testing.T) {
@@ -30,7 +30,7 @@ func TestDownload(t *testing.T) {
 		ContentType:  configuration.ContentAny,
 	}
 
-	client := downloader.New(&cfg, filter.Default()...)
+	client := downloader.New(&cfg, filters.Default()...)
 	stats := client.Download()
 
 	if len(stats.Errors()) != 0 {
@@ -61,7 +61,7 @@ func setupConfig(count int64) configuration.Config {
 
 func BenchmarkDownload1(b *testing.B) {
 	cfg := setupConfig(1)
-	client := downloader.New(&cfg, filter.Default()...)
+	client := downloader.New(&cfg, filters.Default()...)
 	for i := 0; i < b.N; i++ {
 		cfg.Directory = path.Join(os.TempDir(), strconv.Itoa(i))
 		if stats := client.Download(); len(stats.Errors()) != 0 {
@@ -74,7 +74,7 @@ func BenchmarkDownload1(b *testing.B) {
 
 func BenchmarkDownload10(b *testing.B) {
 	cfg := setupConfig(10)
-	client := downloader.New(&cfg, filter.Default()...)
+	client := downloader.New(&cfg, filters.Default()...)
 	for i := 0; i < b.N; i++ {
 		cfg.Directory = path.Join(os.TempDir(), strconv.Itoa(i))
 		if stats := client.Download(); len(stats.Errors()) != 0 {
@@ -87,7 +87,7 @@ func BenchmarkDownload10(b *testing.B) {
 
 func BenchmarkDownload25(b *testing.B) {
 	cfg := setupConfig(25)
-	client := downloader.New(&cfg, filter.Default()...)
+	client := downloader.New(&cfg, filters.Default()...)
 	for i := 0; i < b.N; i++ {
 		cfg.Directory = path.Join(os.TempDir(), strconv.Itoa(i))
 		if stats := client.Download(); len(stats.Errors()) != 0 {
@@ -100,7 +100,7 @@ func BenchmarkDownload25(b *testing.B) {
 
 func BenchmarkDownload50(b *testing.B) {
 	cfg := setupConfig(50)
-	client := downloader.New(&cfg, filter.Default()...)
+	client := downloader.New(&cfg, filters.Default()...)
 	for i := 0; i < b.N; i++ {
 		cfg.Directory = path.Join(os.TempDir(), strconv.Itoa(i))
 		if stats := client.Download(); len(stats.Errors()) != 0 {
@@ -113,7 +113,7 @@ func BenchmarkDownload50(b *testing.B) {
 
 func BenchmarkDownload100(b *testing.B) {
 	cfg := setupConfig(100)
-	client := downloader.New(&cfg, filter.Default()...)
+	client := downloader.New(&cfg, filters.Default()...)
 	for i := 0; i < b.N; i++ {
 		cfg.Directory = path.Join(os.TempDir(), strconv.Itoa(i))
 		if stats := client.Download(); len(stats.Errors()) != 0 {

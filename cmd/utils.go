@@ -3,7 +3,7 @@ package cmd
 import (
 	"github.com/handsomefox/redditdl/downloader"
 	"github.com/handsomefox/redditdl/downloader/configuration"
-	"github.com/handsomefox/redditdl/downloader/filter"
+	"github.com/handsomefox/redditdl/downloader/filters"
 	"github.com/handsomefox/redditdl/logging"
 	"github.com/spf13/cobra"
 )
@@ -75,7 +75,7 @@ func RunCommand(cfg *configuration.Config) {
 	// Download the media
 	log.Info("Started downloading content")
 
-	client := downloader.New(cfg, filter.Default()...)
+	client := downloader.New(cfg, filters.Default()...)
 	stats := client.Download()
 
 	if stats.HasErrors() {

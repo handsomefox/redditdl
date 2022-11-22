@@ -11,7 +11,7 @@ import (
 	"github.com/handsomefox/redditdl/downloader/configuration"
 	"github.com/handsomefox/redditdl/downloader/fetch"
 	"github.com/handsomefox/redditdl/downloader/fetch/api"
-	"github.com/handsomefox/redditdl/downloader/filter"
+	"github.com/handsomefox/redditdl/downloader/filters"
 	"github.com/handsomefox/redditdl/files"
 	"github.com/handsomefox/redditdl/logging"
 	"go.uber.org/zap"
@@ -24,12 +24,12 @@ type Downloader interface {
 }
 
 // New returns a new Downloader instance with the specified configuration.
-func New(config *configuration.Config, filters ...filter.Filter) Downloader {
+func New(config *configuration.Config, fs ...filters.Filter) Downloader {
 	return &downloader{
 		Config:  config,
 		Logger:  logging.Get(config.Verbose),
 		Stats:   &stats{},
-		Filters: filters,
+		Filters: fs,
 	}
 }
 
@@ -39,7 +39,7 @@ type downloader struct {
 	Config  *configuration.Config
 	Logger  *zap.SugaredLogger
 	Stats   *stats
-	Filters []filter.Filter
+	Filters []filters.Filter
 }
 
 // Download downloads the files using the given parameters to downloader in
@@ -110,7 +110,7 @@ func (dl *downloader) FetchPosts(contentChan chan<- *api.Content) {
 			if count == dl.Config.Count {
 				break
 			}
-			if filter.IsFiltered(dl.Config, c, dl.Filters...) {
+			if filters.IsFiltered(dl.Config, c, dl.Filters...) {
 				continue
 			}
 			dl.Stats.queued.Add(1)

@@ -2,7 +2,7 @@
 // that act upon reddit's content and can filter out
 // things that user does not need to download
 // depending on content parameters (like resolution)
-package filter
+package filters
 
 import (
 	"github.com/handsomefox/redditdl/downloader/configuration"
@@ -21,8 +21,8 @@ func Default() []Filter {
 
 // IsFiltered returns a boolean that indicates whether applying filters to the given item
 // indicate that the item is unwanted.
-func IsFiltered(cfg *configuration.Config, item api.Content, filters ...Filter) bool {
-	for _, f := range filters {
+func IsFiltered(cfg *configuration.Config, item api.Content, fs ...Filter) bool {
+	for _, f := range fs {
 		if filtered := f.Filters(item, cfg); filtered {
 			return true
 		}
