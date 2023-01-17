@@ -86,11 +86,10 @@ func BenchmarkDownload1(b *testing.B) {
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		statusCh := dl.Download(context.TODO())
-		for br := false; br != true; {
-			select {
-			case _ = <-statusCh:
-			default:
-				br = true
+		for {
+			_, more := <-statusCh
+			if !more {
+				break
 			}
 		}
 	}
@@ -112,11 +111,10 @@ func BenchmarkDownload25(b *testing.B) {
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		statusCh := dl.Download(context.TODO())
-		for br := false; br != true; {
-			select {
-			case _ = <-statusCh:
-			default:
-				br = true
+		for {
+			_, more := <-statusCh
+			if !more {
+				break
 			}
 		}
 	}
@@ -136,11 +134,10 @@ func BenchmarkDownload100(b *testing.B) {
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		statusCh := dl.Download(context.TODO())
-		for br := false; br != true; {
-			select {
-			case _ = <-statusCh:
-			default:
-				br = true
+		for {
+			_, more := <-statusCh
+			if !more {
+				break
 			}
 		}
 	}
