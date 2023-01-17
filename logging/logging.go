@@ -30,6 +30,9 @@ func Get() *zap.SugaredLogger {
 	case "DEVELOPMENT":
 		cfg = zap.NewDevelopmentEncoderConfig()
 		level = zapcore.DebugLevel
+	default:
+		cfg = zap.NewDevelopmentEncoderConfig()
+		level = zapcore.DebugLevel
 	}
 
 	cfg.EncodeLevel = zapcore.CapitalColorLevelEncoder
