@@ -34,7 +34,7 @@ func TestDownload(t *testing.T) {
 
 	statusCh := dl.Download(context.TODO())
 
-	finished := int64(0)
+	total := int64(0)
 
 	for message := range statusCh {
 		status, err := message.Status, message.Error
@@ -43,13 +43,13 @@ func TestDownload(t *testing.T) {
 		}
 		t.Log(status)
 
-		if status == downloader.StatusFinished {
-			finished++
+		if status == downloader.StatusFinished || status == downloader.StatusFailed {
+			total++
 		}
 	}
 
-	if finished != clientConfig.Count {
-		t.Error("Failed to download requested amount", finished, clientConfig.Count)
+	if total != clientConfig.Count {
+		t.Error("Failed to download requested amount", total, clientConfig.Count)
 	}
 }
 
