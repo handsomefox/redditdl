@@ -1,15 +1,5 @@
 package downloader
 
-// ContentType is the type of media which will be queued for download.
-type ContentType uint8
-
-const (
-	_ ContentType = iota
-	ContentImages
-	ContentVideos
-	ContentAny
-)
-
 const (
 	DefaultWorkerCount = 16
 )
