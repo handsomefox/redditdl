@@ -3,7 +3,6 @@ package downloader_test
 import (
 	"context"
 	"os"
-	"strconv"
 	"testing"
 
 	"github.com/handsomefox/redditdl/client"
@@ -53,7 +52,8 @@ func TestDownload(t *testing.T) {
 	}
 }
 
-func setupConfig(count int64) (*downloader.Config, *client.Config) {
+func setupConfig(dir string, count int64) (*downloader.Config, *client.Config) {
+	os.Setenv("ENVIRONMENT", "PRODUCTION")
 	clientConfig := &client.Config{
 		Subreddit:   "wallpaper",
 		Sorting:     "best",
@@ -64,7 +64,7 @@ func setupConfig(count int64) (*downloader.Config, *client.Config) {
 		MinHeight:   0,
 	}
 	downloaderConfig := &downloader.Config{
-		Directory:    strconv.Itoa(int(count)),
+		Directory:    dir,
 		WorkerCount:  downloader.DefaultWorkerCount,
 		ShowProgress: false,
 		ContentType:  downloader.ContentImages,
@@ -73,76 +73,131 @@ func setupConfig(count int64) (*downloader.Config, *client.Config) {
 }
 
 func BenchmarkDownload1(b *testing.B) {
-	dcfg, ccfg := setupConfig(1)
+	b.StopTimer()
+
+	dir, err := os.MkdirTemp("", "")
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+
+	dcfg, ccfg := setupConfig(dir, 1)
 	dl := downloader.New(dcfg, ccfg, downloader.DefaultFilters()...)
+
+	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		statusCh := dl.Download(context.TODO())
-
-		for message := range statusCh {
-			_, err := message.Status, message.Error
-			if err != nil {
-				b.Error(err)
+		for br := false; br != true; {
+			select {
+			case _ = <-statusCh:
+			default:
+				br = true
 			}
 		}
 	}
+	b.StopTimer()
 }
 
 func BenchmarkDownload10(b *testing.B) {
-	dcfg, ccfg := setupConfig(10)
+	b.StopTimer()
+
+	dir, err := os.MkdirTemp("", "")
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+
+	dcfg, ccfg := setupConfig(dir, 10)
 	dl := downloader.New(dcfg, ccfg, downloader.DefaultFilters()...)
+
+	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		statusCh := dl.Download(context.TODO())
-
-		for message := range statusCh {
-			_, err := message.Status, message.Error
-			if err != nil {
-				b.Error(err)
+		for br := false; br != true; {
+			select {
+			case _ = <-statusCh:
+			default:
+				br = true
 			}
 		}
 	}
+	b.StopTimer()
 }
 
 func BenchmarkDownload25(b *testing.B) {
-	dcfg, ccfg := setupConfig(25)
+	b.StopTimer()
+
+	dir, err := os.MkdirTemp("", "")
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+
+	dcfg, ccfg := setupConfig(dir, 25)
 	dl := downloader.New(dcfg, ccfg, downloader.DefaultFilters()...)
+
+	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		statusCh := dl.Download(context.TODO())
-
-		for message := range statusCh {
-			_, err := message.Status, message.Error
-			if err != nil {
-				b.Error(err)
+		for br := false; br != true; {
+			select {
+			case _ = <-statusCh:
+			default:
+				br = true
 			}
 		}
 	}
+	b.StopTimer()
 }
 
 func BenchmarkDownload50(b *testing.B) {
-	dcfg, ccfg := setupConfig(50)
+	b.StopTimer()
+
+	dir, err := os.MkdirTemp("", "")
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+
+	dcfg, ccfg := setupConfig(dir, 50)
 	dl := downloader.New(dcfg, ccfg, downloader.DefaultFilters()...)
+
+	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		statusCh := dl.Download(context.TODO())
-
-		for message := range statusCh {
-			_, err := message.Status, message.Error
-			if err != nil {
-				b.Error(err)
+		for br := false; br != true; {
+			select {
+			case _ = <-statusCh:
+			default:
+				br = true
 			}
 		}
 	}
+	b.StopTimer()
 }
 
 func BenchmarkDownload100(b *testing.B) {
-	dcfg, ccfg := setupConfig(100)
+	b.StopTimer()
+
+	dir, err := os.MkdirTemp("", "")
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+
+	dcfg, ccfg := setupConfig(dir, 100)
 	dl := downloader.New(dcfg, ccfg, downloader.DefaultFilters()...)
+
+	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		statusCh := dl.Download(context.TODO())
-
-		for message := range statusCh {
-			_, err := message.Status, message.Error
-			if err != nil {
-				b.Error(err)
+		for br := false; br != true; {
+			select {
+			case _ = <-statusCh:
+			default:
+				br = true
 			}
 		}
 	}
+	b.StopTimer()
 }
