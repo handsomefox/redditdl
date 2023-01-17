@@ -37,7 +37,7 @@ func (c *Client) Do(req *http.Request) (*http.Response, error) {
 // GetPosts returns a channel to which the posts will be sent to during fetching.
 // The Channel will be closed after required count is reached, or if there is no more posts we can fetch.
 func (c *Client) GetPosts(ctx context.Context, cfg *Config) <-chan Post {
-	ch := make(chan Post, 16)
+	ch := make(chan Post)
 	go func() {
 		c.postsLoop(ctx, cfg, ch)
 		close(ch)
@@ -45,9 +45,9 @@ func (c *Client) GetPosts(ctx context.Context, cfg *Config) <-chan Post {
 	return ch
 }
 
-// GetFile returns
+// GetFile returns the file data and extension (if found).
 func (c *Client) GetFile(ctx context.Context, url string) (b []byte, extension *string, err error) {
-	request, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, url, http.NoBody)
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -121,4 +121,15 @@ func (c *Client) getPosts(ctx context.Context, url string) (*Posts, error) {
 	}
 
 	return posts, nil
+}
+
+// formatURL formats the URL using the configuration.
+func formatURL(cfg *Config, after string) string {
+	// fStr is the expected format for the request URL to reddit.com.
+	const fStr = "https://www.reddit.com/r/%s/%s.json?limit=%d&t=%s"
+	URL := fmt.Sprintf(fStr, cfg.Subreddit, cfg.Sorting, cfg.Count, cfg.Timeframe)
+	if len(after) > 0 {
+		URL = fmt.Sprintf("%s&after=%s&count=%d", URL, after, cfg.Count)
+	}
+	return URL
 }
