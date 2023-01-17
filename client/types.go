@@ -31,19 +31,18 @@ func NewContent(p Post) *Content {
 		img := &p.Data.Preview.Images[0]
 		return &Content{
 			Name:   p.Data.Title,
-			URL:    strings.ReplaceAll(img.Source.URL, "&amp;s", "&s"),
+			URL:    strings.ReplaceAll(img.Source.URL, "&amp;", "&"),
 			Width:  img.Source.Width,
 			Height: img.Source.Height,
 			Type:   ContentImage,
 		}
-	} else {
-		return &Content{
-			Name:   p.Data.Title,
-			URL:    strings.ReplaceAll(p.Data.Media.RedditVideo.ScrubberMediaURL, "&amp;s", "&s"),
-			Width:  p.Data.Media.RedditVideo.Width,
-			Height: p.Data.Media.RedditVideo.Height,
-			Type:   ContentVideo,
-		}
+	}
+	return &Content{
+		Name:   p.Data.Title,
+		URL:    strings.ReplaceAll(p.Data.Media.RedditVideo.ScrubberMediaURL, "&amp;", "&"),
+		Width:  p.Data.Media.RedditVideo.Width,
+		Height: p.Data.Media.RedditVideo.Height,
+		Type:   ContentVideo,
 	}
 }
 
