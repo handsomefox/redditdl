@@ -105,7 +105,24 @@ func (dl *Downloader) postsLoop(ctx context.Context, contentCh chan<- *client.Co
 	for post := range posts {
 		statusCh <- StatusMessage{Error: nil, Status: StatusStarted}
 		dl.currProgress.queued.Add(1)
-		contentCh <- client.NewContent(post)
+		content := client.NewContent(post)
+		if dl.cfg.ContentType != ContentAny {
+			switch content.Type {
+			case client.ContentImage:
+				if dl.cfg.ContentType != ContentImages {
+					continue
+				}
+			case client.ContentVideo:
+				if dl.cfg.ContentType != ContentVideos {
+					continue
+				}
+			case client.ContentText:
+				continue
+			default:
+				continue
+			}
+		}
+		contentCh <- content
 	}
 }
 
