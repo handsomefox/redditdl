@@ -21,8 +21,7 @@ type Downloader struct {
 	client       *client.Client
 	clientConfig *client.Config
 
-	statusCh chan StatusMessage
-	filters  []Filter
+	filters []Filter
 }
 
 func New(cfg *Config, clientCfg *client.Config, filters ...Filter) *Downloader {
@@ -36,22 +35,21 @@ func New(cfg *Config, clientCfg *client.Config, filters ...Filter) *Downloader {
 		client:       client.NewClient(),
 		clientConfig: clientCfg,
 		filters:      filters,
-		statusCh:     nil,
 	}
 }
 
 // Download return a channel used to communicate download status (started, finished, failed, errors (if any)).
 func (dl *Downloader) Download(ctx context.Context) <-chan StatusMessage {
 	dl.log.Debug(dl.cfg, dl.clientConfig)
-	dl.statusCh = make(chan StatusMessage, 16)
+	statusCh := make(chan StatusMessage, 16)
 	go func() {
-		defer close(dl.statusCh)
-		dl.run(ctx)
+		dl.run(ctx, statusCh)
+		close(statusCh)
 	}()
-	return dl.statusCh
+	return statusCh
 }
 
-func (dl *Downloader) run(ctx context.Context) {
+func (dl *Downloader) run(ctx context.Context, statusCh chan<- StatusMessage) {
 	ctx, cancel := context.WithCancel(ctx)
 	var (
 		contentCh = make(chan *client.Content)
@@ -64,7 +62,7 @@ func (dl *Downloader) run(ctx context.Context) {
 	go func() {
 		defer wg.Done()
 		defer close(contentCh)
-		dl.postsLoop(ctx, contentCh)
+		dl.postsLoop(ctx, contentCh, statusCh)
 	}()
 
 	// Downloading posts from the content channel and storing data in files channel.
@@ -72,7 +70,7 @@ func (dl *Downloader) run(ctx context.Context) {
 	go func() {
 		defer wg.Done()
 		defer close(fileCh)
-		dl.downloadLoop(ctx, fileCh, contentCh)
+		dl.downloadLoop(ctx, fileCh, contentCh, statusCh)
 	}()
 
 	// Saving data from files channel to disk.
@@ -80,9 +78,9 @@ func (dl *Downloader) run(ctx context.Context) {
 	go func() {
 		defer wg.Done()
 		// If we cannot save files, gracefully stop downloading
-		if err := dl.saveLoop(fileCh); err != nil {
+		if err := dl.saveLoop(fileCh, statusCh); err != nil {
 			cancel()
-			dl.log.Info("cannot save files", err)
+			dl.log.Info("cannot save files: ", err)
 			return
 		}
 	}()
@@ -101,37 +99,37 @@ func (dl *Downloader) run(ctx context.Context) {
 }
 
 // postsLoop is fetching posts using the (Downloader.client).GetPosts() and sends them to contentCh.
-func (dl *Downloader) postsLoop(ctx context.Context, contentCh chan<- *client.Content) {
+func (dl *Downloader) postsLoop(ctx context.Context, contentCh chan<- *client.Content, statusCh chan<- StatusMessage) {
 	dl.log.Debug("started fetching posts")
 	posts := dl.client.GetPosts(ctx, dl.clientConfig)
 	for post := range posts {
-		dl.statusCh <- StatusMessage{Error: nil, Status: StatusStarted}
+		statusCh <- StatusMessage{Error: nil, Status: StatusStarted}
 		dl.currProgress.queued.Add(1)
 		contentCh <- client.NewContent(post)
 	}
 }
 
 // downloadLoop is downloading the files from content chan to files chan using multiple goroutines.
-func (dl *Downloader) downloadLoop(ctx context.Context, fileCh chan<- *util.File, contentCh <-chan *client.Content) {
+func (dl *Downloader) downloadLoop(ctx context.Context, fileCh chan<- *util.File, contentCh <-chan *client.Content, statusCh chan<- StatusMessage) {
 	dl.log.Debug("started the download loop")
 	wg := new(sync.WaitGroup)
 	for i := 0; i < dl.cfg.WorkerCount; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			dl.fileLoop(ctx, fileCh, contentCh)
+			dl.fileLoop(ctx, fileCh, contentCh, statusCh)
 		}()
 	}
 	wg.Wait()
 }
 
 // fileLoop gets files from the inChan, fetches their data and stores it in outChan.
-func (dl *Downloader) fileLoop(ctx context.Context, fileCh chan<- *util.File, contentCh <-chan *client.Content) {
+func (dl *Downloader) fileLoop(ctx context.Context, fileCh chan<- *util.File, contentCh <-chan *client.Content, statusCh chan<- StatusMessage) {
 	dl.log.Debug("started the file loop")
 	for content := range contentCh {
 		file, ext, err := dl.client.GetFile(ctx, content.URL)
 		if err != nil {
-			dl.statusCh <- StatusMessage{Error: err, Status: StatusFailed}
+			statusCh <- StatusMessage{Error: err, Status: StatusFailed}
 			dl.currProgress.failed.Add(1)
 			continue
 		}
@@ -143,7 +141,7 @@ func (dl *Downloader) fileLoop(ctx context.Context, fileCh chan<- *util.File, co
 			case client.ContentVideo:
 				extension = ".mp4"
 			default:
-				dl.statusCh <- StatusMessage{Error: ErrNoFileExtension, Status: StatusFailed}
+				statusCh <- StatusMessage{Error: ErrNoFileExtension, Status: StatusFailed}
 				dl.currProgress.failed.Add(1)
 				continue
 			}
@@ -160,7 +158,7 @@ func (dl *Downloader) fileLoop(ctx context.Context, fileCh chan<- *util.File, co
 }
 
 // saveLoop gets data from filesChan and stores it on disk.
-func (dl *Downloader) saveLoop(fileCh <-chan *util.File) error {
+func (dl *Downloader) saveLoop(fileCh <-chan *util.File, statusCh chan<- StatusMessage) error {
 	dl.log.Debug("started the save loop")
 	if err := util.NavigateTo(dl.cfg.Directory, true); err != nil {
 		dl.currProgress.failed.Store(dl.currProgress.queued.Load())
@@ -170,17 +168,17 @@ func (dl *Downloader) saveLoop(fileCh <-chan *util.File) error {
 		filename, err := util.NewFilename(file.Name, file.Extension)
 		if err != nil {
 			dl.log.Debugf("couldn't generate a filename: %s", err.Error())
-			dl.statusCh <- StatusMessage{Error: err, Status: StatusFailed}
+			statusCh <- StatusMessage{Error: err, Status: StatusFailed}
 			dl.currProgress.failed.Add(1)
 			continue
 		}
 		if err := util.Save(filename, file.Data); err != nil {
 			dl.log.Debugf("couldn't save a file: %s", err.Error())
-			dl.statusCh <- StatusMessage{Error: err, Status: StatusFailed}
+			statusCh <- StatusMessage{Error: err, Status: StatusFailed}
 			dl.currProgress.failed.Add(1)
 			continue
 		}
-		dl.statusCh <- StatusMessage{Error: nil, Status: StatusFinished}
+		statusCh <- StatusMessage{Error: nil, Status: StatusFinished}
 		dl.currProgress.finished.Add(1)
 		dl.log.Debugf("saved file: %s", file.Name)
 	}
