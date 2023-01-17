@@ -2,6 +2,7 @@ package downloader
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -174,12 +175,14 @@ func (dl *Downloader) fileLoop(ctx context.Context, fileCh chan<- *util.File, co
 	}
 }
 
+var ErrFailedSave = errors.New("downloader cannot navigate to directory, terminating")
+
 // saveLoop gets data from filesChan and stores it on disk.
 func (dl *Downloader) saveLoop(fileCh <-chan *util.File, statusCh chan<- StatusMessage) error {
 	dl.log.Debug("started the save loop")
 	if err := util.NavigateTo(dl.cfg.Directory, true); err != nil {
 		dl.currProgress.failed.Store(dl.currProgress.queued.Load())
-		return err
+		return ErrFailedSave
 	}
 	for file := range fileCh {
 		filename, err := util.NewFilename(file.Name, file.Extension)

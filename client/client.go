@@ -5,11 +5,17 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
 	"time"
+)
+
+var (
+	ErrCreateRequest     = errors.New("error creating a request")
+	ErrInvalidStatusCode = errors.New("invalid status code")
 )
 
 type Client struct {
@@ -31,7 +37,11 @@ func NewClient() *Client {
 // Do wraps the (*http.Client).Do(), settings required headers before the request is done.
 func (c *Client) Do(req *http.Request) (*http.Response, error) {
 	req.Header.Add("User-Agent", "go:getter")
-	return c.impl.Do(req)
+	resp, err := c.impl.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("error fetching from reddit: %w", err)
+	}
+	return resp, nil
 }
 
 // GetPosts returns a channel to which the posts will be sent to during fetching.
@@ -49,7 +59,7 @@ func (c *Client) GetPosts(ctx context.Context, cfg *Config) <-chan Post {
 func (c *Client) GetFile(ctx context.Context, url string) (b []byte, extension *string, err error) {
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, ErrCreateRequest
 	}
 
 	response, err := c.Do(request)
@@ -59,7 +69,7 @@ func (c *Client) GetFile(ctx context.Context, url string) (b []byte, extension *
 	defer response.Body.Close()
 
 	if response.StatusCode != http.StatusOK {
-		return nil, nil, fmt.Errorf("invalid status code: %s", http.StatusText(response.StatusCode))
+		return nil, nil, fmt.Errorf("%w: %s", ErrInvalidStatusCode, http.StatusText(response.StatusCode))
 	}
 
 	// the URL path is usually equal to something like "randomid.extension",
@@ -102,7 +112,7 @@ func (c *Client) postsLoop(ctx context.Context, cfg *Config, ch chan<- Post) {
 func (c *Client) getPosts(ctx context.Context, url string) (*Posts, error) {
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {
-		return nil, err
+		return nil, ErrCreateRequest
 	}
 
 	response, err := c.Do(request)
@@ -112,7 +122,7 @@ func (c *Client) getPosts(ctx context.Context, url string) (*Posts, error) {
 	defer response.Body.Close()
 
 	if response.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("invalid status code: %s", http.StatusText(response.StatusCode))
+		return nil, fmt.Errorf("%w: %s", ErrInvalidStatusCode, http.StatusText(response.StatusCode))
 	}
 
 	posts := &Posts{}
