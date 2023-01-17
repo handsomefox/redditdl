@@ -1,12 +1,13 @@
 package cmd
 
 import (
+	"context"
 	"os"
 
-	"github.com/handsomefox/redditdl/pkg/downloader"
-	"github.com/handsomefox/redditdl/pkg/downloader/config"
-	"github.com/handsomefox/redditdl/pkg/downloader/filters"
-	"github.com/handsomefox/redditdl/pkg/logging"
+	"github.com/handsomefox/redditdl/client"
+	"github.com/handsomefox/redditdl/downloader"
+	"github.com/handsomefox/redditdl/logging"
+
 	"github.com/spf13/cobra"
 )
 
@@ -21,67 +22,93 @@ func SetCommonFlags(cmd *cobra.Command) {
 	cmd.Flags().StringP("orientation", "o", "", "Content orientation (\"l\"=landscape, \"p\"=portrait, other for any)")
 }
 
-func GetSettings(cmd *cobra.Command) config.Config {
-	var (
-		flags = cmd.Flags()
-		err   error
-		cfg   config.Config
-	)
-	cfg.Directory, err = flags.GetString("dir")
-	cfg.Subreddit, err = flags.GetString("sub")
-	cfg.Sorting, err = flags.GetString("sort")
-	cfg.Timeframe, err = flags.GetString("timeframe")
-	cfg.Orientation, err = flags.GetString("orientation")
-	cfg.Count, err = flags.GetInt64("count")
-	cfg.Width, err = flags.GetInt("width")
-	cfg.Height, err = flags.GetInt("height")
-	cfg.Progress, err = flags.GetBool("progress")
-
-	cfg.ContentType = config.ContentAny
-	cfg.WorkerCount = config.DefaultWorkerCount
-	cfg.SleepTime = config.DefaultSleepTime
-
-	verbose, err := flags.GetBool("verbose")
+func MustNotError(err error) {
 	if err != nil {
 		panic(err)
 	}
-	if verbose {
-		os.Setenv("ENVIRONMENT", "DEVELOPMENT")
-	} else {
-		os.Setenv("ENVIRONMENT", "PRODUCTION")
-	}
-
-	return cfg
 }
 
-func RunCommand(cfg *config.Config) {
-	log := logging.Get(cfg.Verbose)
+func GetSettings(cmd *cobra.Command) (*downloader.Config, *client.Config) {
+	var (
+		flags = cmd.Flags()
+		err   error
+		dcfg  downloader.Config
+		ccfg  client.Config
+	)
+
+	dcfg.Directory, err = flags.GetString("dir")
+	MustNotError(err)
+	dcfg.WorkerCount = downloader.DefaultWorkerCount
+	MustNotError(err)
+	dcfg.ShowProgress, err = flags.GetBool("progress")
+	MustNotError(err)
+	dcfg.ContentType = downloader.ContentAny
+	MustNotError(err)
+	ccfg.Subreddit, err = flags.GetString("sub")
+	MustNotError(err)
+	ccfg.Sorting, err = flags.GetString("sort")
+	MustNotError(err)
+	ccfg.Timeframe, err = flags.GetString("timeframe")
+	MustNotError(err)
+	ccfg.Orientation, err = flags.GetString("orientation")
+	MustNotError(err)
+	ccfg.Count, err = flags.GetInt64("count")
+	MustNotError(err)
+	ccfg.MinWidth, err = flags.GetInt("width")
+	MustNotError(err)
+	ccfg.MinHeight, err = flags.GetInt("height")
+	MustNotError(err)
+	verbose, err := flags.GetBool("verbose")
+	MustNotError(err)
+
+	if verbose {
+		if err := os.Setenv("ENVIRONMENT", "DEVELOPMENT"); err != nil {
+			panic(err)
+		}
+	} else {
+		if err := os.Setenv("ENVIRONMENT", "PRODUCTION"); err != nil {
+			panic(err)
+		}
+	}
+
+	return &dcfg, &ccfg
+}
+
+func RunCommand(ctx context.Context, dcfg *downloader.Config, ccfg *client.Config) {
+	log := logging.Get()
 
 	// Print the configuration
-	log.Debugf("Using parameters: %#v", cfg)
+	log.Debugf("Using parameters: %#v", dcfg)
+	log.Debugf("Using parameters: %#v", ccfg)
 
 	// Download the media
 	log.Info("Started downloading content")
 
-	client := downloader.New(cfg, filters.Default()...)
-	stats := client.Download()
+	dl := downloader.New(dcfg, ccfg, downloader.DefaultFilters()...)
+	statusCh := dl.Download(ctx)
 
-	if stats.HasErrors() {
-		log.Info("Encountered errors during download")
-		for _, err := range stats.Errors() {
-			log.Errorf("%s", err)
+	finished := 0
+
+	for message := range statusCh {
+		status, err := message.Status, message.Error
+		if err != nil {
+			log.Error("error during download=", err.Error())
+		}
+
+		if status == downloader.StatusFinished {
+			finished++
 		}
 	}
 
 	fStr := "Finished downloading %d "
-	switch cfg.ContentType {
-	case config.ContentAny:
+	switch dcfg.ContentType {
+	case downloader.ContentAny:
 		fStr += "image(s)/video(s)"
-	case config.ContentImages:
+	case downloader.ContentImages:
 		fStr += "image(s)"
-	case config.ContentVideos:
+	case downloader.ContentVideos:
 		fStr += "video(s)"
 	}
 
-	log.Infof(fStr, stats.Finished())
+	log.Infof(fStr, finished)
 }
