@@ -79,7 +79,6 @@ func BenchmarkDownload1(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	defer os.RemoveAll(dir)
 
 	dcfg, ccfg := setupConfig(dir, 1)
 	dl := downloader.New(dcfg, ccfg, downloader.DefaultFilters()...)
@@ -96,32 +95,7 @@ func BenchmarkDownload1(b *testing.B) {
 		}
 	}
 	b.StopTimer()
-}
-
-func BenchmarkDownload10(b *testing.B) {
-	b.StopTimer()
-
-	dir, err := os.MkdirTemp("", "")
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer os.RemoveAll(dir)
-
-	dcfg, ccfg := setupConfig(dir, 10)
-	dl := downloader.New(dcfg, ccfg, downloader.DefaultFilters()...)
-
-	b.StartTimer()
-	for i := 0; i < b.N; i++ {
-		statusCh := dl.Download(context.TODO())
-		for br := false; br != true; {
-			select {
-			case _ = <-statusCh:
-			default:
-				br = true
-			}
-		}
-	}
-	b.StopTimer()
+	os.RemoveAll(dir)
 }
 
 func BenchmarkDownload25(b *testing.B) {
@@ -131,7 +105,6 @@ func BenchmarkDownload25(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	defer os.RemoveAll(dir)
 
 	dcfg, ccfg := setupConfig(dir, 25)
 	dl := downloader.New(dcfg, ccfg, downloader.DefaultFilters()...)
@@ -148,42 +121,14 @@ func BenchmarkDownload25(b *testing.B) {
 		}
 	}
 	b.StopTimer()
-}
-
-func BenchmarkDownload50(b *testing.B) {
-	b.StopTimer()
-
-	dir, err := os.MkdirTemp("", "")
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer os.RemoveAll(dir)
-
-	dcfg, ccfg := setupConfig(dir, 50)
-	dl := downloader.New(dcfg, ccfg, downloader.DefaultFilters()...)
-
-	b.StartTimer()
-	for i := 0; i < b.N; i++ {
-		statusCh := dl.Download(context.TODO())
-		for br := false; br != true; {
-			select {
-			case _ = <-statusCh:
-			default:
-				br = true
-			}
-		}
-	}
-	b.StopTimer()
+	os.RemoveAll(dir)
 }
 
 func BenchmarkDownload100(b *testing.B) {
-	b.StopTimer()
-
 	dir, err := os.MkdirTemp("", "")
 	if err != nil {
 		b.Fatal(err)
 	}
-	defer os.RemoveAll(dir)
 
 	dcfg, ccfg := setupConfig(dir, 100)
 	dl := downloader.New(dcfg, ccfg, downloader.DefaultFilters()...)
@@ -200,4 +145,5 @@ func BenchmarkDownload100(b *testing.B) {
 		}
 	}
 	b.StopTimer()
+	os.RemoveAll(dir)
 }
