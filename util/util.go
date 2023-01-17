@@ -1,12 +1,28 @@
-// Package files is a package with utility-like file functions used in redditdl
-package files
+package util
 
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"strings"
 )
+
+// IsValidURL checks if the URL is valid.
+//
+// Example:
+//
+//	fmt.Println(fetch.IsValidURL("www.google.com"))
+//	Output: true
+//
+// Invalid example:
+//
+//	fmt.Println(fetch.IsValidURL("google.com"))
+//	Output: false
+func IsValidURL(str string) bool {
+	u, err := url.ParseRequestURI(str)
+	return err == nil && u.Host != "" && u.Scheme != ""
+}
 
 var ErrEmpty = errors.New("empty parameter provided")
 

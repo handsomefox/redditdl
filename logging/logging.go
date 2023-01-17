@@ -3,6 +3,8 @@
 package logging
 
 import (
+	"os"
+
 	"github.com/mattn/go-colorable"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -11,7 +13,7 @@ import (
 var log *zap.Logger
 
 // Get returns a new logger configured depending on the development bool.
-func Get(development bool) *zap.SugaredLogger {
+func Get() *zap.SugaredLogger {
 	if log != nil {
 		return log.Sugar()
 	}
@@ -19,13 +21,18 @@ func Get(development bool) *zap.SugaredLogger {
 		cfg   zapcore.EncoderConfig
 		level zapcore.Level
 	)
-	switch development {
-	case true:
-		cfg = zap.NewDevelopmentEncoderConfig()
-		level = zapcore.DebugLevel
-	case false:
+
+	env := os.Getenv("ENVIRONMENT")
+	switch env {
+	case "PRODUCTION":
 		cfg = zap.NewProductionEncoderConfig()
 		level = zapcore.InfoLevel
+	case "DEVELOPMENT":
+		cfg = zap.NewDevelopmentEncoderConfig()
+		level = zapcore.DebugLevel
+	default:
+		cfg = zap.NewDevelopmentEncoderConfig()
+		level = zapcore.DebugLevel
 	}
 
 	cfg.EncodeLevel = zapcore.CapitalColorLevelEncoder
@@ -36,5 +43,6 @@ func Get(development bool) *zap.SugaredLogger {
 		zapcore.AddSync(colorable.NewColorableStdout()),
 		level,
 	))
+
 	return log.Sugar()
 }
