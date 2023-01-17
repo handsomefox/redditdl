@@ -1,12 +1,74 @@
-package files_test
+package util
 
 import (
 	"os"
 	"path"
 	"testing"
-
-	"github.com/handsomefox/redditdl/pkg/files"
 )
+
+func TestIsValidURL(t *testing.T) {
+	t.Parallel()
+	type args struct {
+		str string
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{
+			name: "http://",
+			args: args{
+				str: "http://",
+			},
+			want: false,
+		},
+		{
+			name: "google.com",
+			args: args{
+				str: "google.com",
+			},
+			want: false,
+		},
+		{
+			name: "google",
+			args: args{
+				str: "google",
+			},
+			want: false,
+		},
+		{
+			name: "www.google",
+			args: args{
+				str: "www.google",
+			},
+			want: false,
+		},
+		{
+			name: "http://google.com",
+			args: args{
+				str: "http://google.com",
+			},
+			want: true,
+		},
+		{
+			name: "https://google.com",
+			args: args{
+				str: "https://google.com",
+			},
+			want: true,
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := IsValidURL(tt.args.str); got != tt.want {
+				t.Errorf("IsURL() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
 
 func TestNewFilename(t *testing.T) {
 	t.Parallel()
@@ -58,7 +120,7 @@ func TestNewFilename(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := files.NewFilename(tt.args.name, tt.args.extension)
+			got, err := NewFilename(tt.args.name, tt.args.extension)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewFilename() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -103,7 +165,7 @@ func TestExists(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			if got := files.Exists(tt.args.filename); got != tt.want {
+			if got := Exists(tt.args.filename); got != tt.want {
 				t.Errorf("Exists() = %v, want %v", got, tt.want)
 			}
 		})
@@ -148,7 +210,7 @@ func TestNavigateTo(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			if err := files.NavigateTo(tt.args.dir, tt.args.createDir); (err != nil) != tt.wantErr {
+			if err := NavigateTo(tt.args.dir, tt.args.createDir); (err != nil) != tt.wantErr {
 				t.Errorf("NavigateTo() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
