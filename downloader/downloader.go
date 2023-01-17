@@ -27,6 +27,9 @@ type Downloader struct {
 
 func New(cfg *Config, clientCfg *client.Config, filters ...Filter) *Downloader {
 	cfg.WorkerCount %= int(clientCfg.Count)
+	if cfg.WorkerCount <= 0 {
+		cfg.WorkerCount = 1
+	}
 	return &Downloader{
 		log:          logging.Get(),
 		cfg:          cfg,
@@ -40,7 +43,7 @@ func New(cfg *Config, clientCfg *client.Config, filters ...Filter) *Downloader {
 // Download return a channel used to communicate download status (started, finished, failed, errors (if any)).
 func (dl *Downloader) Download(ctx context.Context) <-chan StatusMessage {
 	dl.log.Debug(dl.cfg, dl.clientConfig)
-	dl.statusCh = make(chan StatusMessage)
+	dl.statusCh = make(chan StatusMessage, 16)
 	go func() {
 		dl.run(ctx)
 		close(dl.statusCh)
