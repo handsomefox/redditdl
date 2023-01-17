@@ -45,13 +45,14 @@ func (dl *Downloader) Download(ctx context.Context) <-chan StatusMessage {
 	dl.log.Debug(dl.cfg, dl.clientConfig)
 	dl.statusCh = make(chan StatusMessage, 16)
 	go func() {
+		defer close(dl.statusCh)
 		dl.run(ctx)
-		close(dl.statusCh)
 	}()
 	return dl.statusCh
 }
 
 func (dl *Downloader) run(ctx context.Context) {
+	ctx, cancel := context.WithCancel(ctx)
 	var (
 		contentCh = make(chan *client.Content)
 		fileCh    = make(chan *util.File)
@@ -80,8 +81,7 @@ func (dl *Downloader) run(ctx context.Context) {
 		defer wg.Done()
 		// If we cannot save files, gracefully stop downloading
 		if err := dl.saveLoop(fileCh); err != nil {
-			close(contentCh)
-			close(fileCh)
+			cancel()
 			dl.log.Info("cannot save files", err)
 			return
 		}
