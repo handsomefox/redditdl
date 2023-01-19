@@ -1,4 +1,4 @@
-package cmd
+package common
 
 import (
 	"context"
@@ -7,7 +7,6 @@ import (
 	"github.com/handsomefox/redditdl/client"
 	"github.com/handsomefox/redditdl/downloader"
 	"github.com/handsomefox/redditdl/logging"
-
 	"github.com/spf13/cobra"
 )
 
@@ -22,7 +21,7 @@ func SetCommonFlags(cmd *cobra.Command) {
 	cmd.Flags().StringP("orientation", "o", "", "Content orientation (\"l\"=landscape, \"p\"=portrait, other for any)")
 }
 
-func MustNotError(err error) {
+func mustNotError(err error) {
 	if err != nil {
 		panic(err)
 	}
@@ -37,29 +36,29 @@ func GetSettings(cmd *cobra.Command) (*downloader.Config, *client.Config) {
 	)
 
 	dcfg.Directory, err = flags.GetString("dir")
-	MustNotError(err)
+	mustNotError(err)
 	dcfg.WorkerCount = downloader.DefaultWorkerCount
-	MustNotError(err)
+	mustNotError(err)
 	dcfg.ShowProgress, err = flags.GetBool("progress")
-	MustNotError(err)
+	mustNotError(err)
 	dcfg.ContentType = downloader.ContentAny
-	MustNotError(err)
+	mustNotError(err)
 	ccfg.Subreddit, err = flags.GetString("sub")
-	MustNotError(err)
+	mustNotError(err)
 	ccfg.Sorting, err = flags.GetString("sort")
-	MustNotError(err)
+	mustNotError(err)
 	ccfg.Timeframe, err = flags.GetString("timeframe")
-	MustNotError(err)
+	mustNotError(err)
 	ccfg.Orientation, err = flags.GetString("orientation")
-	MustNotError(err)
+	mustNotError(err)
 	ccfg.Count, err = flags.GetInt64("count")
-	MustNotError(err)
+	mustNotError(err)
 	ccfg.MinWidth, err = flags.GetInt("width")
-	MustNotError(err)
+	mustNotError(err)
 	ccfg.MinHeight, err = flags.GetInt("height")
-	MustNotError(err)
+	mustNotError(err)
 	verbose, err := flags.GetBool("verbose")
-	MustNotError(err)
+	mustNotError(err)
 
 	if verbose {
 		if err := os.Setenv("ENVIRONMENT", "DEVELOPMENT"); err != nil {
