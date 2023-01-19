@@ -12,6 +12,47 @@ import (
 	"go.uber.org/zap"
 )
 
+var (
+	ErrNoFileExtension = errors.New("failed to pick a file extension")
+	ErrFailedSave      = errors.New("downloader cannot navigate to directory, terminating")
+)
+
+const (
+	DefaultWorkerCount = 16
+)
+
+// ContentType is the type of media which will be queued for download.
+type ContentType uint8
+
+const (
+	_ ContentType = iota
+	ContentImages
+	ContentVideos
+	ContentAny
+)
+
+type DownloadStatus byte
+
+const (
+	_ DownloadStatus = iota
+	StatusStarted
+	StatusFinished
+	StatusFailed
+)
+
+type StatusMessage struct {
+	Error  error
+	Status DownloadStatus
+}
+
+// Config is the configuration data for the Downloader.
+type Config struct {
+	Directory    string
+	WorkerCount  int
+	ShowProgress bool
+	ContentType  ContentType
+}
+
 type Downloader struct {
 	currProgress struct{ queued, finished, failed atomic.Int64 }
 	cfg          *Config
@@ -169,8 +210,6 @@ func (dl *Downloader) fileLoop(ctx context.Context, fileCh chan<- *File, content
 		fileCh <- NewFile(content.Name, extension, file)
 	}
 }
-
-var ErrFailedSave = errors.New("downloader cannot navigate to directory, terminating")
 
 // saveLoop gets data from filesChan and stores it on disk.
 func (dl *Downloader) saveLoop(fileCh <-chan *File, statusCh chan<- StatusMessage) error {

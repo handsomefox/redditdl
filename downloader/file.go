@@ -7,6 +7,8 @@ import (
 	"strings"
 )
 
+var ErrEmptyFileParams = errors.New("empty parameters provided, can't create a filename")
+
 // File is the structure that is saved to disk later.
 type File struct {
 	Name      string
@@ -71,16 +73,14 @@ func FileExists(filename string) bool {
 	return true
 }
 
-var ErrEmpty = errors.New("empty parameter provided")
-
 // formatFilename ensures that the filename is valid for NTFS and has the right extension.
 func formatFilename(filename, extension string) (string, error) {
 	const MaxFilenameLength = 255 // This really only accounts for NTFS.
 	if filename == "" {
-		return "", fmt.Errorf("%w: filename can not be empty", ErrEmpty)
+		return "", fmt.Errorf("%w: filename can not be empty", ErrEmptyFileParams)
 	}
 	if extension == "" {
-		return "", fmt.Errorf("%w: extension can not be empty", ErrEmpty)
+		return "", fmt.Errorf("%w: extension can not be empty", ErrEmptyFileParams)
 	}
 
 	filename = removeForbiddenChars(filename)
