@@ -47,12 +47,23 @@ func (c *Client) Do(req *http.Request) (*http.Response, error) {
 // GetPosts returns a channel to which the posts will be sent to during fetching.
 // The Channel will be closed after required count is reached, or if there is no more posts we can fetch.
 func (c *Client) GetPosts(ctx context.Context, cfg *Config) <-chan Post {
-	ch := make(chan Post)
+	ch := make(chan Post, 8)
 	go func() {
 		c.postsLoop(ctx, cfg, ch)
 		close(ch)
 	}()
 	return ch
+}
+
+// GetPostsSync does the same as GetPosts, but instead of returning a channel, returns a slice where
+// all the results are stored.
+func (c *Client) GetPostsSync(ctx context.Context, cfg *Config) []Post {
+	posts := make([]Post, 0, cfg.Count)
+	postCh := c.GetPosts(ctx, cfg)
+	for post := range postCh {
+		posts = append(posts, post)
+	}
+	return posts
 }
 
 // GetFile returns the file data and extension (if found).
@@ -96,7 +107,6 @@ func (c *Client) postsLoop(ctx context.Context, cfg *Config, ch chan<- Post) {
 			time.Sleep(sleepTime)
 			continue
 		}
-
 		for _, post := range posts.Data.Children {
 			ch <- post
 			count++
