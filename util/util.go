@@ -60,7 +60,7 @@ func NewFilename(name, extension string) (string, error) {
 		return "", fmt.Errorf("%w: failed to create filename (name=%s,ext=%s)", err, name, extension)
 	}
 	// Resolve duplicates
-	for i := 0; Exists(formatted); i++ {
+	for i := 0; FileExists(formatted); i++ {
 		formatted, err = format(fmt.Sprintf("(%d) %s", i, name), extension)
 		if err != nil {
 			return "", fmt.Errorf("%w: failed to create filename (name=%s,ext=%s)", err, name, extension)
@@ -69,8 +69,8 @@ func NewFilename(name, extension string) (string, error) {
 	return formatted, nil
 }
 
-// Exists returns whether the file exists.
-func Exists(filename string) bool {
+// FileExists returns whether the file exists.
+func FileExists(filename string) bool {
 	if _, err := os.Stat(filename); err != nil {
 		return false
 	}

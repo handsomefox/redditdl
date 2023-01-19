@@ -165,7 +165,7 @@ func TestExists(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			if got := Exists(tt.args.filename); got != tt.want {
+			if got := FileExists(tt.args.filename); got != tt.want {
 				t.Errorf("Exists() = %v, want %v", got, tt.want)
 			}
 		})
