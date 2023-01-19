@@ -32,12 +32,12 @@ type File struct {
 	Data            []byte
 }
 
-// New returns a pointer to a new File.
+// NewFile returns a pointer to a new File.
 //
 // Example:
 //
-//	f := files.New("image", "jpg", []byte{12,23,54})
-func New(name, ext string, data []byte) *File {
+//	f := files.NewFile("image", "jpg", []byte{12,23,54})
+func NewFile(name, ext string, data []byte) *File {
 	return &File{
 		Name:      name,
 		Extension: ext,
