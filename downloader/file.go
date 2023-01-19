@@ -1,35 +1,17 @@
-package util
+package downloader
 
 import (
 	"errors"
 	"fmt"
-	"net/url"
 	"os"
 	"strings"
 )
 
-// IsValidURL checks if the URL is valid.
-//
-// Example:
-//
-//	fmt.Println(fetch.IsValidURL("www.google.com"))
-//	Output: true
-//
-// Invalid example:
-//
-//	fmt.Println(fetch.IsValidURL("google.com"))
-//	Output: false
-func IsValidURL(str string) bool {
-	u, err := url.ParseRequestURI(str)
-	return err == nil && u.Host != "" && u.Scheme != ""
-}
-
-var ErrEmpty = errors.New("empty parameter provided")
-
 // File is the structure that is saved to disk later.
 type File struct {
-	Name, Extension string
-	Data            []byte
+	Name      string
+	Extension string
+	Data      []byte
 }
 
 // NewFile returns a pointer to a new File.
@@ -45,6 +27,18 @@ func NewFile(name, ext string, data []byte) *File {
 	}
 }
 
+// Save saves the file to the provided path/filename.
+func (f *File) Save() error {
+	filename, err := NewFilename(f.Name, f.Extension)
+	if err != nil {
+		return fmt.Errorf("%w: couldn't save file", err)
+	}
+	if err := os.WriteFile(filename, f.Data, 0o600); err != nil {
+		return fmt.Errorf("%w: couldn't save file(name=%s)", err, filename)
+	}
+	return nil
+}
+
 // NewFilename generates a valid filename for the media.
 //
 // It accounts for:
@@ -55,13 +49,13 @@ func NewFile(name, ext string, data []byte) *File {
 // It returns an error when:
 //   - Name or Extensions arguments are empty.
 func NewFilename(name, extension string) (string, error) {
-	formatted, err := format(name, extension)
+	formatted, err := formatFilename(name, extension)
 	if err != nil {
 		return "", fmt.Errorf("%w: failed to create filename (name=%s,ext=%s)", err, name, extension)
 	}
 	// Resolve duplicates
 	for i := 0; FileExists(formatted); i++ {
-		formatted, err = format(fmt.Sprintf("(%d) %s", i, name), extension)
+		formatted, err = formatFilename(fmt.Sprintf("(%d) %s", i, name), extension)
 		if err != nil {
 			return "", fmt.Errorf("%w: failed to create filename (name=%s,ext=%s)", err, name, extension)
 		}
@@ -77,10 +71,11 @@ func FileExists(filename string) bool {
 	return true
 }
 
-const MaxFilenameLength = 255 // This really only accounts for NTFS.
+var ErrEmpty = errors.New("empty parameter provided")
 
-// format ensures that the filename is valid for NTFS and has the right extension.
-func format(filename, extension string) (string, error) {
+// formatFilename ensures that the filename is valid for NTFS and has the right extension.
+func formatFilename(filename, extension string) (string, error) {
+	const MaxFilenameLength = 255 // This really only accounts for NTFS.
 	if filename == "" {
 		return "", fmt.Errorf("%w: filename can not be empty", ErrEmpty)
 	}
@@ -99,11 +94,10 @@ func format(filename, extension string) (string, error) {
 	return fmt.Sprintf("%s.%s", filename, extension), nil
 }
 
-// Most of the characters are forbidden on Windows only.
-const forbiddenChars = "/<>\":\\|?*"
-
 // removeForbiddenChars removes invalid characters for Linux/Windows filenames.
 func removeForbiddenChars(name string) string {
+	// Most of the characters are forbidden on Windows only.
+	const forbiddenChars = "/<>\":\\|?*"
 	for _, c := range forbiddenChars {
 		name = strings.ReplaceAll(name, string(c), "")
 	}
@@ -121,14 +115,6 @@ func NavigateTo(dir string, createDir bool) error {
 	}
 	if err := os.Chdir(dir); err != nil {
 		return fmt.Errorf("%w: couldn't navigate to directory(name=%s)", err, dir)
-	}
-	return nil
-}
-
-// Save saves the file to the provided path/filename.
-func Save(filename string, b []byte) error {
-	if err := os.WriteFile(filename, b, 0o600); err != nil {
-		return fmt.Errorf("%w: couldn't write file(name=%s)", err, filename)
 	}
 	return nil
 }

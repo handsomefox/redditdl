@@ -9,7 +9,6 @@ import (
 
 	"github.com/handsomefox/redditdl/client"
 	"github.com/handsomefox/redditdl/logging"
-	"github.com/handsomefox/redditdl/util"
 	"go.uber.org/zap"
 )
 
@@ -54,7 +53,7 @@ func (dl *Downloader) run(ctx context.Context, statusCh chan<- StatusMessage) {
 	ctx, cancel := context.WithCancel(ctx)
 	var (
 		contentCh = make(chan *client.Content)
-		fileCh    = make(chan *util.File)
+		fileCh    = make(chan *File)
 	)
 
 	// Fetching posts to the content channel for further download.
@@ -128,7 +127,7 @@ func (dl *Downloader) postsLoop(ctx context.Context, contentCh chan<- *client.Co
 }
 
 // downloadLoop is downloading the files from content chan to files chan using multiple goroutines.
-func (dl *Downloader) downloadLoop(ctx context.Context, fileCh chan<- *util.File, contentCh <-chan *client.Content, statusCh chan<- StatusMessage) {
+func (dl *Downloader) downloadLoop(ctx context.Context, fileCh chan<- *File, contentCh <-chan *client.Content, statusCh chan<- StatusMessage) {
 	dl.log.Debug("started the download loop")
 	wg := new(sync.WaitGroup)
 	for i := 0; i < dl.cfg.WorkerCount; i++ {
@@ -142,7 +141,7 @@ func (dl *Downloader) downloadLoop(ctx context.Context, fileCh chan<- *util.File
 }
 
 // fileLoop gets files from the inChan, fetches their data and stores it in outChan.
-func (dl *Downloader) fileLoop(ctx context.Context, fileCh chan<- *util.File, contentCh <-chan *client.Content, statusCh chan<- StatusMessage) {
+func (dl *Downloader) fileLoop(ctx context.Context, fileCh chan<- *File, contentCh <-chan *client.Content, statusCh chan<- StatusMessage) {
 	dl.log.Debug("started the file loop")
 	for content := range contentCh {
 		file, ext, err := dl.client.GetFile(ctx, content.URL)
@@ -167,32 +166,21 @@ func (dl *Downloader) fileLoop(ctx context.Context, fileCh chan<- *util.File, co
 			extension = *ext
 		}
 
-		fileCh <- &util.File{
-			Name:      content.Name,
-			Extension: extension,
-			Data:      file,
-		}
+		fileCh <- NewFile(content.Name, extension, file)
 	}
 }
 
 var ErrFailedSave = errors.New("downloader cannot navigate to directory, terminating")
 
 // saveLoop gets data from filesChan and stores it on disk.
-func (dl *Downloader) saveLoop(fileCh <-chan *util.File, statusCh chan<- StatusMessage) error {
+func (dl *Downloader) saveLoop(fileCh <-chan *File, statusCh chan<- StatusMessage) error {
 	dl.log.Debug("started the save loop")
-	if err := util.NavigateTo(dl.cfg.Directory, true); err != nil {
+	if err := NavigateTo(dl.cfg.Directory, true); err != nil {
 		dl.currProgress.failed.Store(dl.currProgress.queued.Load())
 		return ErrFailedSave
 	}
 	for file := range fileCh {
-		filename, err := util.NewFilename(file.Name, file.Extension)
-		if err != nil {
-			dl.log.Debugf("couldn't generate a filename: %s", err.Error())
-			statusCh <- StatusMessage{Error: err, Status: StatusFailed}
-			dl.currProgress.failed.Add(1)
-			continue
-		}
-		if err := util.Save(filename, file.Data); err != nil {
+		if err := file.Save(); err != nil {
 			dl.log.Debugf("couldn't save a file: %s", err.Error())
 			statusCh <- StatusMessage{Error: err, Status: StatusFailed}
 			dl.currProgress.failed.Add(1)

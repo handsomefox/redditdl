@@ -1,8 +1,9 @@
 package downloader
 
 import (
+	"net/url"
+
 	"github.com/handsomefox/redditdl/client"
-	"github.com/handsomefox/redditdl/util"
 )
 
 // DefaultFilters returns a slice of the filters included in this package.
@@ -52,7 +53,7 @@ func FilterWidthHeight() FilterFunc {
 // FilterInvalidURLs is a filter that filters out invalid FilterInvalidURLs.
 func FilterInvalidURLs() FilterFunc {
 	return func(item client.Content, _ *client.Config) bool {
-		if len(item.URL) > 0 && util.IsValidURL(item.URL) {
+		if len(item.URL) > 0 && isValidURL(item.URL) {
 			return false
 		}
 		return true
@@ -80,4 +81,20 @@ func FilterOrientation() FilterFunc {
 		}
 		return true
 	}
+}
+
+// isValidURL checks if the URL is valid.
+//
+// Example:
+//
+//	fmt.Println(fetch.isValidURL("www.google.com"))
+//	Output: true
+//
+// Invalid example:
+//
+//	fmt.Println(fetch.isValidURL("google.com"))
+//	Output: false
+func isValidURL(str string) bool {
+	u, err := url.ParseRequestURI(str)
+	return err == nil && u.Host != "" && u.Scheme != ""
 }
