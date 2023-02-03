@@ -24,3 +24,6 @@ go.work
 .idea/
 
 dist/
+
+# Go vendor folder
+vendor/
