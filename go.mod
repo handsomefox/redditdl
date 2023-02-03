@@ -1,6 +1,6 @@
 module github.com/handsomefox/redditdl
 
-go 1.19
+go 1.20
 
 require (
 	github.com/mattn/go-colorable v0.1.13
