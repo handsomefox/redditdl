@@ -11,6 +11,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/handsomefox/redditdl/client/media"
 )
 
 var (
@@ -48,10 +50,42 @@ func (c *Client) Do(req *http.Request) (*http.Response, error) {
 	return resp, nil
 }
 
+// NewContent just gets the information from posts and returns it in a *Content struct.
+func (c *Client) NewContent(ctx context.Context, p media.RedditPost) (*media.Content, error) {
+	data, extension, err := c.GetFileDataAndExtension(ctx, p.URL())
+	if err != nil {
+		data.Close() // close if cannot create.
+		return nil, err
+	}
+	cnt := &media.Content{
+		ReadCloser:  data,
+		Name:        p.Title(),
+		URL:         p.URL(),
+		Width:       p.Width(),
+		Height:      p.Height(),
+		Type:        p.Type(),
+		Orientation: p.Orientation(),
+		NSFW:        p.Data.Over18,
+	}
+	if extension == nil {
+		switch cnt.Type {
+		case media.ContentVideo:
+			cnt.Extension = "mp4"
+		case media.ContentImage:
+			cnt.Extension = "jpg"
+		default:
+			cnt.Extension = ""
+		}
+	} else {
+		cnt.Extension = *extension
+	}
+	return cnt, nil
+}
+
 // GetPostsContent returns a channel to which the posts will be sent to during fetching.
 // The Channel will be closed after required count is reached, or if there is no more posts we can fetch.
-func (c *Client) GetPostsContent(ctx context.Context, count int64, subreddit string) <-chan *Content {
-	ch := make(chan *Content, 8)
+func (c *Client) GetPostsContent(ctx context.Context, count int64, subreddit string) <-chan *media.Content {
+	ch := make(chan *media.Content, 8)
 	go func() {
 		c.postsLoop(ctx, count, subreddit, ch)
 		close(ch)
@@ -61,8 +95,8 @@ func (c *Client) GetPostsContent(ctx context.Context, count int64, subreddit str
 
 // GetPostsContentSync does the same as GetPostsContent, but instead of returning a channel, returns a slice where
 // all the results are stored.
-func (c *Client) GetPostsContentSync(ctx context.Context, count int64, subreddit string) []*Content {
-	s := make([]*Content, 0, count)
+func (c *Client) GetPostsContentSync(ctx context.Context, count int64, subreddit string) []*media.Content {
+	s := make([]*media.Content, 0, count)
 	contentCh := c.GetPostsContent(ctx, count, subreddit)
 	for content := range contentCh {
 		s = append(s, content)
@@ -93,7 +127,7 @@ func (c *Client) GetFileDataAndExtension(ctx context.Context, url string) (io.Re
 	return response.Body, extension, nil
 }
 
-func (c *Client) postsLoop(ctx context.Context, count int64, subreddit string, ch chan<- *Content) {
+func (c *Client) postsLoop(ctx context.Context, count int64, subreddit string, ch chan<- *media.Content) {
 	const sleepTime = 200 * time.Millisecond // this is enough to not get ratelimited
 	var after string
 	for i := int64(0); i < count; {
@@ -118,7 +152,7 @@ func (c *Client) postsLoop(ctx context.Context, count int64, subreddit string, c
 
 // getPosts fetches a json file from reddit containing information
 // about the posts using the given configuration.
-func (c *Client) getPosts(ctx context.Context, url string) (*RedditPosts, error) {
+func (c *Client) getPosts(ctx context.Context, url string) (*media.RedditPosts, error) {
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return nil, ErrCreateRequest
@@ -134,7 +168,7 @@ func (c *Client) getPosts(ctx context.Context, url string) (*RedditPosts, error)
 		return nil, fmt.Errorf("%w: %s", ErrInvalidStatusCode, http.StatusText(response.StatusCode))
 	}
 
-	posts := &RedditPosts{}
+	posts := &media.RedditPosts{}
 	if err := json.NewDecoder(response.Body).Decode(posts); err != nil {
 		return nil, fmt.Errorf("%w: %s", err, "couldn't decode posts")
 	}

@@ -1,7 +1,6 @@
-package client
+package media
 
 import (
-	"context"
 	"io"
 )
 
@@ -42,36 +41,4 @@ type Content struct {
 	Type          ContentType
 	Orientation   Orientation
 	NSFW          bool
-}
-
-// NewContent just gets the information from posts and returns it in a *Content struct.
-func (c *Client) NewContent(ctx context.Context, p RedditPost) (*Content, error) {
-	data, extension, err := c.GetFileDataAndExtension(ctx, p.URL())
-	if err != nil {
-		data.Close() // close if cannot create.
-		return nil, err
-	}
-	cnt := &Content{
-		ReadCloser:  data,
-		Name:        p.Title(),
-		URL:         p.URL(),
-		Width:       p.Width(),
-		Height:      p.Height(),
-		Type:        p.Type(),
-		Orientation: p.Orientation(),
-		NSFW:        p.Data.Over18,
-	}
-	if extension == nil {
-		switch cnt.Type {
-		case ContentVideo:
-			cnt.Extension = "mp4"
-		case ContentImage:
-			cnt.Extension = "jpg"
-		default:
-			cnt.Extension = ""
-		}
-	} else {
-		cnt.Extension = *extension
-	}
-	return cnt, nil
 }
