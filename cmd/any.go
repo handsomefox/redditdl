@@ -3,8 +3,7 @@ package cmd
 import (
 	"context"
 
-	"github.com/handsomefox/redditdl/cmd/common"
-	"github.com/handsomefox/redditdl/downloader"
+	"github.com/handsomefox/redditdl/cmd/params"
 	"github.com/spf13/cobra"
 )
 
@@ -17,13 +16,11 @@ different subreddits from reddit.com, applying different
 filters to the content which will be downloaded.
 `,
 	Run: func(cmd *cobra.Command, _ []string) {
-		dcfg, ccfg := common.GetSettings(cmd)
-		dcfg.ContentType = downloader.ContentAny
-		common.RunCommand(context.Background(), dcfg, ccfg)
+		params := GetCLIParameters(cmd, params.RequiredContentTypeAny)
+		MustRunCommand(context.Background(), params)
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(anyCmd)
-	common.SetCommonFlags(anyCmd)
 }
