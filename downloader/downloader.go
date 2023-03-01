@@ -69,7 +69,7 @@ func New(cliParams *params.CLIParameters, filters ...Filter) (*Downloader, error
 		workerCount = 1
 	}
 
-	log.Debug().Int("worker_count", workerCount)
+	log.Debug().Int("worker_count", workerCount).Send()
 
 	return &Downloader{
 		cliParams:   cliParams,
