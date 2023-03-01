@@ -146,7 +146,7 @@ func TestNewFilename(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := downloader.NewFilename(tt.args.name, tt.args.extension)
+			got, err := downloader.NewFormattedFilename(tt.args.name, tt.args.extension)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewFilename() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -236,7 +236,7 @@ func TestNavigateTo(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			if err := downloader.NavigateTo(tt.args.dir, tt.args.createDir); (err != nil) != tt.wantErr {
+			if err := downloader.ChdirOrCreate(tt.args.dir, tt.args.createDir); (err != nil) != tt.wantErr {
 				t.Errorf("NavigateTo() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
