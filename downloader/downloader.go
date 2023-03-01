@@ -24,12 +24,11 @@ type Stats struct {
 }
 
 type Downloader struct {
-	progressTracker struct {
+	progress struct {
 		queued   atomic.Int64
 		finished atomic.Int64
 		failed   atomic.Int64
 	}
-
 	cliParams   *params.CLIParameters
 	client      *client.Client
 	filters     []Filter
@@ -210,40 +209,81 @@ func (dl *Downloader) downloadAndSaveLoop(basePath string, contentCh <-chan *med
 func (dl *Downloader) printProgressLoop(exitCh <-chan struct{}) {
 	log.Debug().Msg("started the progress loop")
 
-	const fStr = "Current progress: queued=%d, finished=%d, failed=%d"
+	type LastProgress struct {
+		queued, finished, failed int64
+	}
+
+	var (
+		// Store the progress so we don't print redundant statements
+		lastProgress = LastProgress{}
+		// Use this to compare progress quickly
+		less = func(p1, p2 LastProgress) bool {
+			sum1 := p1.queued + p1.failed + p1.finished
+			sum2 := p2.queued + p2.failed + p2.finished
+			return sum1 < sum2
+		}
+		// Specified format string for printing
+		fStr = "Download status: Queued=%d; Finished=%d; Failed=%d."
+		// Function used for printing (by default, zerolog)
+		printFunc = func(msg string) {
+			log.Info().Msg(msg)
+		}
+	)
+
+	if !dl.cliParams.VerboseLogging {
+		// if no logging will be done, we can take control and print in a single line.
+		fStr = "Download status: Queued=%d; Finished=%d; Failed=%d\r"
+		// Use package fmt for carriage return working correctly
+		printFunc = func(msg string) {
+			fmt.Print(msg)
+		}
+	}
 
 	for {
 		select {
 		case <-exitCh:
 			return
 		default:
-			p := &dl.progressTracker
-			log.Info().Msg(fmt.Sprintf(fStr, p.queued.Load(), p.finished.Load(), p.failed.Load()))
+			p := &dl.progress
+
+			currProgress := LastProgress{
+				queued:   p.queued.Load(),
+				finished: p.finished.Load(),
+				failed:   p.failed.Load(),
+			}
+
+			// Only print if there is a difference between the two
+			if less(lastProgress, currProgress) {
+				printFunc(fmt.Sprintf(fStr, currProgress.queued, currProgress.finished, currProgress.failed))
+				// Update the progress
+				lastProgress = currProgress
+			}
+			// No need to update all the time
 			time.Sleep(time.Second)
 		}
 	}
 }
 
 func (dl *Downloader) addFinished() {
-	dl.progressTracker.finished.Add(1)
+	dl.progress.finished.Add(1)
 }
 
 func (dl *Downloader) addFailed() {
-	dl.progressTracker.failed.Add(1)
+	dl.progress.failed.Add(1)
 }
 
 func (dl *Downloader) addQueued() {
-	dl.progressTracker.queued.Add(1)
+	dl.progress.queued.Add(1)
 }
 
 func (dl *Downloader) loadFinished() int64 {
-	return dl.progressTracker.finished.Load()
+	return dl.progress.finished.Load()
 }
 
 func (dl *Downloader) loadFailed() int64 {
-	return dl.progressTracker.failed.Load()
+	return dl.progress.failed.Load()
 }
 
 func (dl *Downloader) loadQueued() int64 {
-	return dl.progressTracker.queued.Load()
+	return dl.progress.queued.Load()
 }
