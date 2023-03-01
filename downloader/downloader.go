@@ -97,13 +97,13 @@ func (dl *Downloader) run(ctx context.Context, statusCh chan<- StatusMessage) {
 
 	for _, subreddit := range dl.cliParams.Subreddits {
 		// Navigate to original directory.
-		err := NavigateTo(wd, true)
+		err := ChdirOrCreate(wd, true)
 		if err != nil {
 			log.Err(err).Msg("failed to navigate to working directory")
 			return
 		}
 		// Change directory to specific subreddit.
-		if err := NavigateTo(subreddit, true); err != nil {
+		if err := ChdirOrCreate(subreddit, true); err != nil {
 			log.Err(err).Msg("failed to navigate to subreddit directory")
 			return
 		}
@@ -179,7 +179,7 @@ func (dl *Downloader) downloadAndSaveLoop(ctx context.Context, contentCh <-chan 
 }
 
 func saveContent(b []byte, content *media.Content) error {
-	filename, err := NewFilename(content.Name, content.Extension)
+	filename, err := NewFormattedFilename(content.Name, content.Extension)
 	if err != nil {
 		return fmt.Errorf("%w: couldn't save file", err)
 	}
