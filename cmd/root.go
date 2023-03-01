@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// Flags for the command-line.
 var (
 	ContentTypeFlag *string
 	WidthFlag       *int
@@ -23,38 +24,14 @@ var (
 	SubredditsFlag  *[]string
 	VerboseFlag     *bool
 	ProgressFlag    *bool
-	FilterNSFW      *bool
+	FilterNSFWFlag  *bool
 )
 
+// The only command we need.
 var rootCmd = &cobra.Command{
 	Use:   "redditdl",
 	Short: "A tool for downloading images/videos from reddit.com",
-	Long: `redditdl is a CLI application written in Go that allows users
-to very quickly download images and videos from different
-subreddits of reddit.com, filtering them by multiple options.
-`,
-	Run: func(cmd *cobra.Command, args []string) {
-		var orientationByte params.RequiredOrientation
-		orientation := *OrientationFlag
-		switch orientation {
-		case "l":
-			orientationByte = params.RequiredOrientationLandscape
-		case "p":
-			orientationByte = params.RequiredOrientationPortrait
-		default:
-			orientationByte = params.RequiredOrientationAny
-		}
-		var ct params.RequiredContentType
-		switch *ContentTypeFlag {
-		case "image":
-			ct = params.RequiredContentTypeImages
-		case "video":
-			ct = params.RequiredContentTypeVideos
-		case "any":
-			ct = params.RequiredContentTypeAny
-		default:
-			ct = params.RequiredContentTypeAny
-		}
+	Run: func(_ *cobra.Command, _ []string) {
 		cliParameters := &params.CLIParameters{
 			Sort:             *SortFlag,
 			Timeframe:        *TimeframeFlag,
@@ -63,14 +40,14 @@ subreddits of reddit.com, filtering them by multiple options.
 			MediaMinWidth:    *WidthFlag,
 			MediaMinHeight:   *HeightFlag,
 			MediaCount:       *CountFLag,
-			MediaOrientation: orientationByte,
-			ContentType:      ct,
+			MediaOrientation: params.OrientationFromString(*OrientationFlag),
+			ContentType:      params.RequiredContentTypeFromString(*ContentTypeFlag),
 			ShowProgress:     *ProgressFlag,
 			VerboseLogging:   *VerboseFlag,
 		}
 
 		df := downloader.DefaultFilters()
-		if *FilterNSFW {
+		if *FilterNSFWFlag {
 			df = append(df, downloader.FilterNSFW())
 		}
 
@@ -86,22 +63,39 @@ func Execute() {
 }
 
 func init() {
+	// Don't sort, as it is confusing to see width/height be in different parts of help message and etc.
+
 	rootCmd.Flags().SortFlags = false
-	ContentTypeFlag = rootCmd.Flags().String("ctype", "image", "Describes the type of content to download, possible values: image/video/any")
-	WidthFlag = rootCmd.Flags().IntP("width", "x", 0, "Minimal content horizontal resolution")
-	HeightFlag = rootCmd.Flags().IntP("height", "y", 0, "Minimal content vertical resolution")
-	CountFLag = rootCmd.Flags().Int64P("count", "c", 1, "Amount of files to download (may download less than specified)")
-	SortFlag = rootCmd.Flags().StringP("sort", "s", "top", "Possible values: controversial/best/hot/new/random/rising/top)")
-	TimeframeFlag = rootCmd.Flags().StringP("timeframe", "t", "all", "Possible values: hour/day/week/month/year/all)")
-	DirectoryFlag = rootCmd.Flags().StringP("dir", "d", "media", "Download path")
-	OrientationFlag = rootCmd.Flags().StringP("orientation", "o", "", "Content orientation (\"l\"=landscape, \"p\"=portrait, other for any)")
-	SubredditsFlag = rootCmd.Flags().StringSlice("subs", []string{}, "Comma-separated list of subreddits to fetch from")
-	VerboseFlag = rootCmd.PersistentFlags().BoolP("verbose", "v", false, "If true, more logging is enabled")
-	ProgressFlag = rootCmd.PersistentFlags().BoolP("progress", "p", false, "If true, displays the ongoing progress")
-	FilterNSFW = rootCmd.Flags().Bool("nsfw", true, "If true, NSFW content will be ignored")
+
+	// Set the flags
+	ContentTypeFlag = rootCmd.Flags().String("ctype",
+		"image", "Describes the type of content to download, possible values: image/video/any")
+	WidthFlag = rootCmd.Flags().IntP("width", "x", 0,
+		"Minimal content horizontal resolution")
+	HeightFlag = rootCmd.Flags().IntP("height", "y", 0,
+		"Minimal content vertical resolution")
+	CountFLag = rootCmd.Flags().Int64P("count", "c", 1,
+		"Amount of files to download (may download less than specified)")
+	SortFlag = rootCmd.Flags().StringP("sort", "s", "top",
+		"Possible values: controversial/best/hot/new/random/rising/top)")
+	TimeframeFlag = rootCmd.Flags().StringP("timeframe", "t", "all",
+		"Possible values: hour/day/week/month/year/all)")
+	DirectoryFlag = rootCmd.Flags().StringP("dir", "d", "media",
+		"Download path")
+	OrientationFlag = rootCmd.Flags().StringP("orientation", "o", "",
+		"Content orientation (\"l\"=landscape, \"p\"=portrait, other for any)")
+	SubredditsFlag = rootCmd.Flags().StringSlice("subs", []string{},
+		"Comma-separated list of subreddits to fetch from")
+	VerboseFlag = rootCmd.PersistentFlags().BoolP("verbose", "v", false,
+		"If true, more logging is enabled")
+	ProgressFlag = rootCmd.PersistentFlags().BoolP("progress", "p", false,
+		"If true, displays the ongoing progress")
+	FilterNSFWFlag = rootCmd.
+		Flags().Bool("nsfw", true, "If true, NSFW content will be ignored")
 }
 
 func SetGlobalLoggingLevel(verbose bool) {
+	// Package logging using an env variable for the logger.
 	if verbose {
 		if err := os.Setenv("ENVIRONMENT", "DEVELOPMENT"); err != nil {
 			panic(err)
@@ -117,14 +111,11 @@ func MustRunCommand(ctx context.Context, p *params.CLIParameters, filters ...dow
 	if p == nil {
 		panic("nil parameters provided")
 	}
-
 	SetGlobalLoggingLevel(p.VerboseLogging)
 
 	log := logging.Get()
-
 	// Print the configuration
 	log.Debugf("Using parameters: %#v", p)
-
 	// Download the media
 	log.Info("Started downloading content")
 
@@ -132,21 +123,19 @@ func MustRunCommand(ctx context.Context, p *params.CLIParameters, filters ...dow
 	if err != nil {
 		panic(err) // no point in continuing
 	}
-	statusCh := dl.Download(ctx)
-
-	finished := 0
-
+	var (
+		statusCh = dl.Download(ctx)
+		finished = 0
+	)
 	for message := range statusCh {
 		status, err := message.Status, message.Error
 		if err != nil {
 			log.Error("error during download=", err.Error())
 		}
-
 		if status == downloader.StatusFinished {
 			finished++
 		}
 	}
-
 	fStr := "Finished downloading %d "
 	switch p.ContentType {
 	case params.RequiredContentTypeAny:
@@ -156,6 +145,5 @@ func MustRunCommand(ctx context.Context, p *params.CLIParameters, filters ...dow
 	case params.RequiredContentTypeVideos:
 		fStr += "video(s)"
 	}
-
 	log.Infof(fStr, finished)
 }
