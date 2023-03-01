@@ -14,7 +14,13 @@ import (
 func TestDownload(t *testing.T) {
 	t.Parallel()
 
-	p := setupConfig(t.TempDir(), 25)
+	dir, err := os.MkdirTemp("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+
+	p := setupConfig(dir, 25)
 
 	dl, err := downloader.New(p, downloader.DefaultFilters()...)
 	if err != nil {
@@ -45,39 +51,40 @@ func setupConfig(dir string, count int64) *params.CLIParameters {
 	return cliParams
 }
 
-func Download(b *testing.B, count int64) {
-	b.Helper()
-	b.StopTimer()
-
+func BenchmarkDownload10(b *testing.B) {
 	dir, err := os.MkdirTemp("", "")
 	if err != nil {
 		b.Fatal(err)
 	}
+	defer os.RemoveAll(dir)
 
-	p := setupConfig(dir, count)
+	p := setupConfig(dir, 10)
 	dl, err := downloader.New(p, downloader.DefaultFilters()...)
 	if err != nil {
 		b.Fatal(err)
 	}
 
-	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		_ = dl.Download(context.TODO())
 	}
-	b.StopTimer()
-	os.RemoveAll(dir)
 }
 
-func BenchmarkDownload1(b *testing.B) {
-	Download(b, 1)
-}
+func BenchmarkDownload50(b *testing.B) {
+	dir, err := os.MkdirTemp("", "")
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
 
-func BenchmarkDownload25(b *testing.B) {
-	Download(b, 25)
-}
+	p := setupConfig(dir, 50)
+	dl, err := downloader.New(p, downloader.DefaultFilters()...)
+	if err != nil {
+		b.Fatal(err)
+	}
 
-func BenchmarkDownload100(b *testing.B) {
-	Download(b, 100)
+	for i := 0; i < b.N; i++ {
+		_ = dl.Download(context.TODO())
+	}
 }
 
 func TestNewFilename(t *testing.T) {
