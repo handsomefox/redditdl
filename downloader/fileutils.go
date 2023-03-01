@@ -4,18 +4,24 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
+
+	"github.com/rs/zerolog/log"
 )
 
 var ErrEmptyFileParams = errors.New("empty parameters provided, can't create a filename")
 
-func SaveBytesToDisk(b []byte, name, extensions string) error {
+func SaveBytesToDisk(b []byte, basePath, name, extensions string) error {
 	filename, err := NewFormattedFilename(name, extensions)
 	if err != nil {
 		return fmt.Errorf("%w: couldn't save file", err)
 	}
 
-	if err := os.WriteFile(filename, b, 0o600); err != nil {
+	fullname := filepath.Join(basePath, filename)
+	log.Debug().Str("fullname", fullname).Msg("saving file")
+
+	if err := os.WriteFile(fullname, b, 0o600); err != nil {
 		return fmt.Errorf("%w: couldn't save file(name=%s)", err, filename)
 	}
 

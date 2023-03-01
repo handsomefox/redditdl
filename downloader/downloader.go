@@ -115,6 +115,10 @@ func (dl *Downloader) run(ctx context.Context) Stats {
 			return Stats{}
 		}
 
+		currentDir := filepath.Join(workdir, subreddit)
+
+		log.Debug().Str("current_dir", currentDir).Msg("currently saving to this directory")
+
 		// Change directory to specific subreddit.
 		if err := ChdirOrCreate(subreddit, true); err != nil {
 			log.Err(err).Msg("failed to navigate to subreddit directory")
@@ -139,7 +143,7 @@ func (dl *Downloader) run(ctx context.Context) Stats {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			dl.downloadAndSaveLoop(contentCh)
+			dl.downloadAndSaveLoop(currentDir, contentCh)
 		}()
 		wg.Wait()
 	}
@@ -171,7 +175,7 @@ func (dl *Downloader) getPostsLoop(ctx context.Context, subreddit string, conten
 	}
 }
 
-func (dl *Downloader) downloadAndSaveLoop(contentCh <-chan *media.Content) {
+func (dl *Downloader) downloadAndSaveLoop(basePath string, contentCh <-chan *media.Content) {
 	log.Debug().Msg("starting download/save loop")
 
 	type Saving struct {
@@ -213,7 +217,7 @@ func (dl *Downloader) downloadAndSaveLoop(contentCh <-chan *media.Content) {
 
 	go func() {
 		for saving := range saveCh {
-			err := SaveBytesToDisk(saving.Bytes, saving.Name, saving.Extension)
+			err := SaveBytesToDisk(saving.Bytes, basePath, saving.Name, saving.Extension)
 			if err != nil {
 				dl.addFailed()
 			} else {
