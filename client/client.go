@@ -48,7 +48,7 @@ func (c *Client) Do(req *http.Request) (*http.Response, error) {
 
 	resp, err := c.impl.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrDoRequest, err)
+		return nil, fmt.Errorf("%w: %s", ErrDoRequest, err.Error())
 	}
 
 	return resp, nil
