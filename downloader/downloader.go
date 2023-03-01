@@ -90,9 +90,16 @@ func (dl *Downloader) run(ctx context.Context, statusCh chan<- StatusMessage) {
 		dl.log.Error("cannot get working directory", err)
 		return
 	}
+
+	if filepath.IsAbs(dl.cliParams.Directory) {
+		wd = dl.cliParams.Directory
+	} else {
+		wd = filepath.Join(wd, dl.cliParams.Directory)
+	}
+
 	for _, subreddit := range dl.cliParams.Subreddits {
 		// Navigate to original directory.
-		err := NavigateTo(filepath.Join(wd, dl.cliParams.Directory), true)
+		err := NavigateTo(wd, true)
 		if err != nil {
 			dl.log.Error("failed to navigate to working directory ", err)
 			return
