@@ -51,7 +51,6 @@ func (c *Client) Do(req *http.Request) (*http.Response, error) {
 func (c *Client) NewContent(ctx context.Context, post media.RedditPost) (*media.Content, error) {
 	data, extension, err := c.GetFileDataAndExtension(ctx, post.URL())
 	if err != nil {
-		defer data.Close()
 		return nil, err
 	}
 
