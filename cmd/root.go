@@ -104,27 +104,28 @@ func SetGlobalLoggingLevel(verbose bool) {
 	}
 }
 
-func MustRunCommand(ctx context.Context, p *params.CLIParameters, filters ...downloader.Filter) {
-	if p == nil {
-		panic("nil parameters provided")
+func MustRunCommand(ctx context.Context, cliParams *params.CLIParameters, filters ...downloader.Filter) {
+	if cliParams == nil {
+		log.Fatal().Msg("provided CLI parameters are nil")
+		return
 	}
 
-	SetGlobalLoggingLevel(p.VerboseLogging)
+	SetGlobalLoggingLevel(cliParams.VerboseLogging)
 
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
 	// Print the configuration
-	log.Debug().Any("configuration", *p).Send()
+	log.Debug().Any("configuration", *cliParams).Send()
 	// Download the media
 	log.Info().Msg("started downloading content")
 
-	dl, err := downloader.New(p, filters...)
+	dler, err := downloader.New(cliParams, filters...)
 	if err != nil {
 		panic(err) // no point in continuing
 	}
 
 	var (
-		statusCh = dl.Download(ctx)
+		statusCh = dler.Download(ctx)
 		finished = 0
 	)
 
@@ -133,13 +134,15 @@ func MustRunCommand(ctx context.Context, p *params.CLIParameters, filters ...dow
 		if err != nil {
 			log.Err(err).Msg("error during download")
 		}
+
 		if status == downloader.StatusFinished {
 			finished++
 		}
 	}
 
 	fStr := "Finished downloading %d "
-	switch p.ContentType {
+
+	switch cliParams.ContentType {
 	case params.RequiredContentTypeAny:
 		fStr += "image(s)/video(s)"
 	case params.RequiredContentTypeImages:
