@@ -23,6 +23,7 @@ var (
 	SubredditsFlag  *[]string
 	VerboseFlag     *bool
 	ProgressFlag    *bool
+	FilterNSFW      *bool
 )
 
 var rootCmd = &cobra.Command{
@@ -67,7 +68,13 @@ subreddits of reddit.com, filtering them by multiple options.
 			ShowProgress:     *ProgressFlag,
 			VerboseLogging:   *VerboseFlag,
 		}
-		MustRunCommand(context.Background(), cliParameters)
+
+		df := downloader.DefaultFilters()
+		if *FilterNSFW {
+			df = append(df, downloader.FilterNSFW())
+		}
+
+		MustRunCommand(context.Background(), cliParameters, df...)
 	},
 }
 
@@ -91,6 +98,7 @@ func init() {
 	SubredditsFlag = rootCmd.Flags().StringSlice("subs", []string{}, "Comma-separated list of subreddits to fetch from")
 	VerboseFlag = rootCmd.PersistentFlags().BoolP("verbose", "v", false, "If true, more logging is enabled")
 	ProgressFlag = rootCmd.PersistentFlags().BoolP("progress", "p", false, "If true, displays the ongoing progress")
+	FilterNSFW = rootCmd.Flags().Bool("nsfw", true, "If true, NSFW content will be ignored")
 }
 
 func SetGlobalLoggingLevel(verbose bool) {
@@ -105,7 +113,7 @@ func SetGlobalLoggingLevel(verbose bool) {
 	}
 }
 
-func MustRunCommand(ctx context.Context, p *params.CLIParameters) {
+func MustRunCommand(ctx context.Context, p *params.CLIParameters, filters ...downloader.Filter) {
 	if p == nil {
 		panic("nil parameters provided")
 	}
@@ -120,7 +128,7 @@ func MustRunCommand(ctx context.Context, p *params.CLIParameters) {
 	// Download the media
 	log.Info("Started downloading content")
 
-	dl, err := downloader.New(p, log, downloader.DefaultFilters()...)
+	dl, err := downloader.New(p, log, filters...)
 	if err != nil {
 		panic(err) // no point in continuing
 	}

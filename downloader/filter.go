@@ -80,6 +80,12 @@ func FilterOrientation() FilterFunc {
 	}
 }
 
+func FilterNSFW() FilterFunc {
+	return func(item media.Content, p *params.CLIParameters) bool {
+		return item.NSFW
+	}
+}
+
 // IsValidURL checks if the URL is valid.
 //
 // Example:
