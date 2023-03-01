@@ -273,6 +273,9 @@ func (dl *Downloader) printProgressLoop(exitCh <-chan struct{}) {
 	for {
 		select {
 		case <-exitCh:
+			if !dl.cliParams.VerboseLogging {
+				printFunc("\n")
+			}
 			return
 		default:
 			p := &dl.progress
