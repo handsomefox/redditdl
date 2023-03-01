@@ -53,8 +53,8 @@ func FilterWidthHeight() FilterFunc {
 
 // FilterInvalidURLs is a filter that filters out invalid FilterInvalidURLs.
 func FilterInvalidURLs() FilterFunc {
-	return func(item media.Content, p *params.CLIParameters) bool {
-		if len(item.URL) > 0 && isValidURL(item.URL) {
+	return func(item media.Content, _ *params.CLIParameters) bool {
+		if len(item.URL) > 0 && IsValidURL(item.URL) {
 			return false
 		}
 		return true
@@ -80,18 +80,18 @@ func FilterOrientation() FilterFunc {
 	}
 }
 
-// isValidURL checks if the URL is valid.
+// IsValidURL checks if the URL is valid.
 //
 // Example:
 //
-//	fmt.Println(fetch.isValidURL("www.google.com"))
+//	fmt.Println(fetch.IsValidURL("www.google.com"))
 //	Output: true
 //
 // Invalid example:
 //
-//	fmt.Println(fetch.isValidURL("google.com"))
+//	fmt.Println(fetch.IsValidURL("google.com"))
 //	Output: false
-func isValidURL(str string) bool {
+func IsValidURL(str string) bool {
 	u, err := url.ParseRequestURI(str)
 	return err == nil && u.Host != "" && u.Scheme != ""
 }

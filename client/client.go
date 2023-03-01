@@ -136,6 +136,9 @@ func (c *Client) postsLoop(ctx context.Context, count int64, subreddit string, c
 			time.Sleep(sleepTime)
 			continue
 		}
+		if len(posts.Data.Children) == 0 {
+			return
+		}
 		for _, post := range posts.Data.Children {
 			cnt, err := c.NewContent(ctx, post)
 			if err != nil {
