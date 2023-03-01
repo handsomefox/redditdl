@@ -9,38 +9,26 @@ import (
 	"github.com/handsomefox/redditdl/cmd"
 	"github.com/handsomefox/redditdl/cmd/params"
 	"github.com/handsomefox/redditdl/downloader"
-	"github.com/handsomefox/redditdl/logging"
 )
 
 func TestDownload(t *testing.T) {
 	t.Parallel()
 
 	p := setupConfig(t.TempDir(), 25)
-	log := logging.Get()
 
-	dl, err := downloader.New(p, log, downloader.DefaultFilters()...)
+	dl, err := downloader.New(p, downloader.DefaultFilters()...)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	statusCh := dl.Download(context.TODO())
-	total := int64(0)
-	for message := range statusCh {
-		status, err := message.Status, message.Error
-		if err != nil {
-			t.Log(err)
-		}
-		if status == downloader.StatusFinished || status == downloader.StatusFailed {
-			total++
-		}
-	}
-	if total < 1 {
-		t.Error("Failed to download requested amount", total, p.MediaCount)
+	status := dl.Download(context.TODO())
+	if status.Finished < 1 {
+		t.Error("Failed to download requested amount", status.Finished, p.MediaCount)
 	}
 }
 
 func setupConfig(dir string, count int64) *params.CLIParameters {
-	os.Setenv("ENVIRONMENT", "PRODUCTION")
+	cmd.SetGlobalLoggingLevel(false)
 	cliParams := &params.CLIParameters{
 		Sort:             "best",
 		Timeframe:        "all",
@@ -54,7 +42,6 @@ func setupConfig(dir string, count int64) *params.CLIParameters {
 		ShowProgress:     false,
 		VerboseLogging:   false,
 	}
-	cmd.SetGlobalLoggingLevel(false)
 	return cliParams
 }
 
@@ -68,20 +55,14 @@ func Download(b *testing.B, count int64) {
 	}
 
 	p := setupConfig(dir, count)
-	dl, err := downloader.New(p, logging.Get(), downloader.DefaultFilters()...)
+	dl, err := downloader.New(p, downloader.DefaultFilters()...)
 	if err != nil {
 		b.Fatal(err)
 	}
 
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		statusCh := dl.Download(context.TODO())
-		for {
-			_, more := <-statusCh
-			if !more {
-				break
-			}
-		}
+		_ = dl.Download(context.TODO())
 	}
 	b.StopTimer()
 	os.RemoveAll(dir)
@@ -149,7 +130,7 @@ func TestNewFilename(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := downloader.NewFilename(tt.args.name, tt.args.extension)
+			got, err := downloader.NewFormattedFilename(tt.args.name, tt.args.extension)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewFilename() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -239,7 +220,7 @@ func TestNavigateTo(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			if err := downloader.NavigateTo(tt.args.dir, tt.args.createDir); (err != nil) != tt.wantErr {
+			if err := downloader.ChdirOrCreate(tt.args.dir, tt.args.createDir); (err != nil) != tt.wantErr {
 				t.Errorf("NavigateTo() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})

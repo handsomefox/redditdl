@@ -9,6 +9,17 @@ const (
 	RequiredOrientationAny
 )
 
+func OrientationFromString(s string) RequiredOrientation {
+	switch s {
+	case "l":
+		return RequiredOrientationLandscape
+	case "p":
+		return RequiredOrientationPortrait
+	default:
+		return RequiredOrientationAny
+	}
+}
+
 type RequiredContentType byte
 
 const (
@@ -17,6 +28,19 @@ const (
 	RequiredContentTypeVideos
 	RequiredContentTypeAny
 )
+
+func RequiredContentTypeFromString(s string) RequiredContentType {
+	switch s {
+	case "image":
+		return RequiredContentTypeImages
+	case "video":
+		return RequiredContentTypeVideos
+	case "any":
+		return RequiredContentTypeAny
+	default:
+		return RequiredContentTypeAny
+	}
+}
 
 type CLIParameters struct {
 	Sort             string

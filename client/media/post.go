@@ -47,6 +47,7 @@ func (p *RedditPost) Width() int {
 	case ContentImage:
 		return p.Data.Preview.Images[0].Source.Width
 	}
+
 	return 0
 }
 
@@ -58,6 +59,7 @@ func (p *RedditPost) Height() int {
 	case ContentImage:
 		return p.Data.Preview.Images[0].Source.Height
 	}
+
 	return 0
 }
 
@@ -69,15 +71,19 @@ func (p *RedditPost) Dimensions() (w, h int) {
 // Orientation calculates the orientation of video/image.
 func (p *RedditPost) Orientation() Orientation {
 	width, height := p.Dimensions()
+
 	if p.Type() == ContentText {
 		return OrientationAny
 	}
+
 	if width > height {
 		return OrientationLandscape
 	}
+
 	if height > width {
 		return OrientationPortrait
 	}
+
 	return OrientationAny
 }
 
@@ -93,6 +99,7 @@ func (p *RedditPost) Type() ContentType {
 	} else if len(p.Data.Preview.Images) > 0 {
 		return ContentImage
 	}
+
 	return ContentText
 }
 
@@ -104,6 +111,7 @@ func (p *RedditPost) URL() string {
 		if err != nil {
 			return strings.ReplaceAll(p.Data.URL, "&amp;", "&")
 		}
+
 		return strings.ReplaceAll(img.Source.URL, "&amp;", "&")
 	case ContentVideo:
 		return strings.ReplaceAll(p.Data.Media.RedditVideo.ScrubberMediaURL, "&amp;", "&")
@@ -118,6 +126,7 @@ func (p *RedditPost) PreviewImage() (*Image, error) {
 	if len(p.Data.Preview.Images) == 0 {
 		return nil, ErrNoImages
 	}
+
 	return &p.Data.Preview.Images[0], nil
 }
 

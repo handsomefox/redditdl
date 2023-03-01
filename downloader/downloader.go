@@ -15,12 +15,13 @@ import (
 	"github.com/handsomefox/redditdl/client"
 	"github.com/handsomefox/redditdl/client/media"
 	"github.com/handsomefox/redditdl/cmd/params"
-	"go.uber.org/zap"
+	"github.com/rs/zerolog/log"
 )
 
 var (
 	ErrNoFileExtension = errors.New("failed to pick a file extension")
 	ErrFailedSave      = errors.New("downloader cannot navigate to directory, terminating")
+	ErrNoParams        = errors.New("no parameters were provided")
 )
 
 const (
@@ -41,168 +42,227 @@ type StatusMessage struct {
 	Status DownloadStatus
 }
 
-type Downloader struct {
-	currProgress struct{ queued, finished, failed atomic.Int64 }
-	cliParams    *params.CLIParameters
-	log          *zap.SugaredLogger
-	client       *client.Client
-	filters      []Filter
-	workerCount  int
+type Stats struct {
+	Finished, Failed int64
 }
 
-func New(cliParams *params.CLIParameters, logger *zap.SugaredLogger, filters ...Filter) (*Downloader, error) {
+type Downloader struct {
+	progressTracker struct {
+		queued   atomic.Int64
+		finished atomic.Int64
+		failed   atomic.Int64
+	}
+
+	cliParams   *params.CLIParameters
+	client      *client.Client
+	filters     []Filter
+	workerCount int
+}
+
+func New(cliParams *params.CLIParameters, filters ...Filter) (*Downloader, error) {
 	if cliParams == nil {
-		return nil, fmt.Errorf("no params provided")
+		return nil, ErrNoParams
 	}
-	wc := (runtime.NumCPU() * 2) % int(cliParams.MediaCount)
-	if wc <= 0 {
-		wc = 1
+
+	workerCount := runtime.NumCPU() % int(cliParams.MediaCount)
+	if workerCount <= 0 {
+		workerCount = 1
 	}
+
+	log.Debug().Int("worker_count", workerCount)
+
 	return &Downloader{
-		log:         logger,
 		cliParams:   cliParams,
 		client:      client.NewClient(cliParams.Sort, cliParams.Timeframe),
 		filters:     filters,
-		workerCount: wc,
+		workerCount: workerCount,
 	}, nil
 }
 
 // Download return a channel used to communicate download status (started, finished, failed, errors (if any)).
-func (dl *Downloader) Download(ctx context.Context) <-chan StatusMessage {
-	dl.log.Debug(dl.cliParams)
-	statusCh := make(chan StatusMessage, 16)
-	go func() {
-		dl.run(ctx, statusCh)
-		close(statusCh)
-	}()
-	return statusCh
+func (dl *Downloader) Download(ctx context.Context) Stats {
+	log.Debug().Any("parameters", dl.cliParams).Send()
+
+	return dl.run(ctx)
 }
 
-func (dl *Downloader) run(ctx context.Context, statusCh chan<- StatusMessage) {
+func (dl *Downloader) run(ctx context.Context) Stats {
 	exitChan := make(chan struct{})
+
 	defer close(exitChan)
+
 	if dl.cliParams.ShowProgress {
-		go dl.progressLoop(exitChan)
+		go dl.printProgressLoop(exitChan)
 	}
 
-	wd, err := os.Getwd()
+	workdir, err := os.Getwd()
 	if err != nil {
-		dl.log.Error("cannot get working directory", err)
-		return
+		log.Err(err).Msg("cannot get working directory")
+		return Stats{}
 	}
 
 	if filepath.IsAbs(dl.cliParams.Directory) {
-		wd = dl.cliParams.Directory
+		workdir = dl.cliParams.Directory
 	} else {
-		wd = filepath.Join(wd, dl.cliParams.Directory)
+		workdir = filepath.Join(workdir, dl.cliParams.Directory)
 	}
 
 	for _, subreddit := range dl.cliParams.Subreddits {
 		// Navigate to original directory.
-		err := NavigateTo(wd, true)
+		err := ChdirOrCreate(workdir, true)
 		if err != nil {
-			dl.log.Error("failed to navigate to working directory ", err)
-			return
+			log.Err(err).Msg("failed to navigate to working directory")
+			return Stats{}
 		}
+
 		// Change directory to specific subreddit.
-		if err := NavigateTo(subreddit, true); err != nil {
-			dl.log.Error("failed to navigate to subreddit directory ", err)
-			return
+		if err := ChdirOrCreate(subreddit, true); err != nil {
+			log.Err(err).Msg("failed to navigate to subreddit directory")
+			return Stats{}
 		}
+
 		// Start the download
 		var (
 			contentCh = make(chan *media.Content)
 			wg        = new(sync.WaitGroup)
 		)
+
 		// Fetching posts to the content channel for further download.
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			defer close(contentCh)
-			dl.postsLoop(ctx, subreddit, contentCh, statusCh)
+			dl.getPostsLoop(ctx, subreddit, contentCh)
 		}()
+
 		// Downloading posts from the content channel and storing data in files channel.
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			dl.downloadAndSaveLoop(ctx, contentCh, statusCh)
+			dl.downloadAndSaveLoop(contentCh)
 		}()
 		wg.Wait()
 	}
+
 	if dl.cliParams.ShowProgress {
 		exitChan <- struct{}{}
 	}
-}
 
-// postsLoop is fetching posts using the (Downloader.client).GetPosts() and sends them to contentCh.
-func (dl *Downloader) postsLoop(ctx context.Context, subreddit string, contentCh chan<- *media.Content, statusCh chan<- StatusMessage) {
-	dl.log.Debug("started fetching posts")
-	cnts := dl.client.GetPostsContent(ctx, dl.cliParams.MediaCount, subreddit)
-	for content := range cnts {
-		if IsFiltered(dl.cliParams, *content, dl.filters...) {
-			continue
-		}
-		dl.currProgress.queued.Add(1)
-		statusCh <- StatusMessage{Error: nil, Status: StatusStarted}
-		contentCh <- content
+	return Stats{
+		Finished: dl.loadFinished(),
+		Failed:   dl.loadFailed(),
 	}
 }
 
-func (dl *Downloader) downloadAndSaveLoop(ctx context.Context, contentCh <-chan *media.Content, statusCh chan<- StatusMessage) {
-	dl.log.Debug("starting download/save loop")
-	var (
-		wg     = new(sync.WaitGroup)
-		diskMu = new(sync.Mutex) // locked when the goroutine is saving the file to a disk
-	)
+// getPostsLoop is fetching posts using the (Downloader.client).GetPosts() and sends them to contentCh.
+func (dl *Downloader) getPostsLoop(ctx context.Context, subreddit string, contentOutCh chan<- *media.Content) {
+	log.Debug().Msg("started fetching posts")
+
+	contentCh := dl.client.GetPostsContent(ctx, dl.cliParams.MediaCount, subreddit)
+
+	for content := range contentCh {
+		if IsFiltered(dl.cliParams, content, dl.filters...) {
+			continue
+		}
+
+		dl.addQueued()
+
+		contentOutCh <- content
+	}
+}
+
+func (dl *Downloader) downloadAndSaveLoop(contentCh <-chan *media.Content) {
+	log.Debug().Msg("starting download/save loop")
+
+	type Saving struct {
+		Name      string
+		Extension string
+		Bytes     []byte
+	}
+
+	const BufferSize = 8
+
+	saveCh := make(chan *Saving, BufferSize)
+
+	defer close(saveCh)
+
+	wg := new(sync.WaitGroup)
+
 	for i := 0; i < dl.workerCount; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for cnt := range contentCh {
-				b, err := io.ReadAll(cnt)
+
+			for content := range contentCh {
+				b, err := io.ReadAll(content)
 				if err != nil {
-					dl.currProgress.failed.Add(1)
-					statusCh <- StatusMessage{Error: err, Status: StatusFailed}
+					dl.addFailed()
 					continue
 				}
-				diskMu.Lock()
-				if err := saveContent(b, cnt); err != nil {
-					dl.currProgress.failed.Add(1)
-					statusCh <- StatusMessage{Error: err, Status: StatusFailed}
+
+				content.Close()
+
+				saveCh <- &Saving{
+					Bytes:     b,
+					Name:      content.Name,
+					Extension: content.Extension,
 				}
-				diskMu.Unlock()
-				cnt.Close()
-				dl.currProgress.finished.Add(1)
-				statusCh <- StatusMessage{Error: nil, Status: StatusFinished}
 			}
 		}()
 	}
+
+	go func() {
+		for saving := range saveCh {
+			err := SaveBytesToDisk(saving.Bytes, saving.Name, saving.Extension)
+			if err != nil {
+				dl.addFailed()
+			} else {
+				dl.addFinished()
+			}
+		}
+	}()
+
 	wg.Wait()
 }
 
-func saveContent(b []byte, content *media.Content) error {
-	filename, err := NewFilename(content.Name, content.Extension)
-	if err != nil {
-		return fmt.Errorf("%w: couldn't save file", err)
-	}
-	if err := os.WriteFile(filename, b, 0o600); err != nil {
-		return fmt.Errorf("%w: couldn't save file(name=%s)", err, filename)
-	}
-	return nil
-}
+// printProgressLoop prints the current progress of download every two seconds.
+func (dl *Downloader) printProgressLoop(exitCh <-chan struct{}) {
+	log.Debug().Msg("started the progress loop")
 
-// progressLoop prints the current progress of download every two seconds.
-func (dl *Downloader) progressLoop(exitCh <-chan struct{}) {
-	dl.log.Debug("started the progress loop")
 	const fStr = "Current progress: queued=%d, finished=%d, failed=%d"
+
 	for {
 		select {
 		case <-exitCh:
 			return
 		default:
-			p := &dl.currProgress
-			dl.log.Infof(fStr, p.queued.Load(), p.finished.Load(), p.failed.Load())
+			p := &dl.progressTracker
+			log.Info().Msg(fmt.Sprintf(fStr, p.queued.Load(), p.finished.Load(), p.failed.Load()))
 			time.Sleep(time.Second)
 		}
 	}
+}
+
+func (dl *Downloader) addFinished() {
+	dl.progressTracker.finished.Add(1)
+}
+
+func (dl *Downloader) addFailed() {
+	dl.progressTracker.failed.Add(1)
+}
+
+func (dl *Downloader) addQueued() {
+	dl.progressTracker.queued.Add(1)
+}
+
+func (dl *Downloader) loadFinished() int64 {
+	return dl.progressTracker.finished.Load()
+}
+
+func (dl *Downloader) loadFailed() int64 {
+	return dl.progressTracker.failed.Load()
+}
+
+func (dl *Downloader) loadQueued() int64 {
+	return dl.progressTracker.queued.Load()
 }
