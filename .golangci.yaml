@@ -1,0 +1,79 @@
+run:
+  skip-dirs-use-default: true
+  allow-parallel-runners: true
+  go: "1.20"
+
+output:
+  print-issued-lines: true
+  print-linter-name: true
+  unique-by-line: false
+  sort-results: true
+
+linters-settings:
+  staticcheck:
+    go: "1.20"
+    checks:
+      - all
+  govet:
+    enable-all: true
+    check-shadowing: false
+    disable:
+      - shadow
+      - fieldalignment
+  errcheck:
+    check-blank: true
+    check-type-assertions: true
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - experimental
+      - opinionated
+      - performance
+      - style
+      - security
+linters:
+  fast: false
+  presets:
+    - bugs
+    - comment
+    - complexity
+    - error
+    - format
+    - import
+    - metalinter
+    - module
+    - performance
+    - sql
+    - style
+    - test
+    - unused
+  disable:
+    - cyclop
+    - depguard
+    - exhaustivestruct
+    - exhaustruct
+    - forbidigo
+    - funlen
+    - gci
+    - gochecknoinits
+    - gochecknoglobals
+    - gocognit
+    - godox
+    - gofmt
+    - gofumpt
+    - goheader
+    - goimports
+    - gomnd
+    - gomoddirectives
+    - gomodguard
+    - importas
+    - loggercheck
+    - nonamedreturns
+    - tagliatelle
+    - testpackage
+    - nlreturn
+    - varnamelen
+    - wsl
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
