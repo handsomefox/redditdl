@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -13,12 +12,6 @@ import (
 	"time"
 
 	"github.com/handsomefox/redditdl/client/media"
-)
-
-var (
-	ErrCreateRequest     = errors.New("error creating a request")
-	ErrInvalidStatusCode = errors.New("invalid status code")
-	ErrDoRequest         = errors.New("error performing request to reddit api")
 )
 
 type Client struct {
