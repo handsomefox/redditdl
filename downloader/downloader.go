@@ -1,6 +1,7 @@
 package downloader
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -21,6 +22,12 @@ import (
 // Stats reports the download results.
 type Stats struct {
 	Finished, Failed int64
+}
+
+// queueItem will be scheduled for saving to disk later using the path specified.
+type queueItem struct {
+	Content  *media.Content
+	Fullpath string
 }
 
 type Downloader struct {
@@ -77,53 +84,68 @@ func (dl *Downloader) run(ctx context.Context) Stats {
 		return Stats{}
 	}
 
+	// Figure out absolute path for saving files later.
 	if filepath.IsAbs(dl.cliParams.Directory) {
 		workdir = dl.cliParams.Directory
 	} else {
 		workdir = filepath.Join(workdir, dl.cliParams.Directory)
 	}
 
-	for _, subreddit := range dl.cliParams.Subreddits {
-		// Navigate to original directory.
-		err := ChdirOrCreate(workdir, true)
-		if err != nil {
-			log.Err(err).Msg("failed to navigate to working directory")
-			return Stats{}
-		}
-
-		currentDir := filepath.Join(workdir, subreddit)
-
-		log.Debug().Str("current_dir", currentDir).Msg("currently saving to this directory")
-
-		// Change directory to specific subreddit.
-		if err := ChdirOrCreate(subreddit, true); err != nil {
-			log.Err(err).Msg("failed to navigate to subreddit directory")
-			return Stats{}
-		}
-
-		// Start the download
-		var (
-			contentCh = make(chan *media.Content)
-			wg        = new(sync.WaitGroup)
-		)
-
-		// Fetching posts to the content channel for further download.
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			defer close(contentCh)
-			dl.getPostsLoop(ctx, subreddit, contentCh)
-		}()
-
-		// Downloading posts from the content channel and storing data in files channel.
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			dl.downloadAndSaveLoop(currentDir, contentCh)
-		}()
-		wg.Wait()
+	// Navigate to specified directory.
+	err = ChdirOrCreate(workdir, true)
+	if err != nil {
+		log.Err(err).Msg("failed to navigate to specified directory")
+		return Stats{}
 	}
 
+	// Create all directories beforehand.
+	for _, subreddit := range dl.cliParams.Subreddits {
+		dirPath := filepath.Join(workdir, subreddit)
+		if err := os.Mkdir(dirPath, os.ModePerm); err != nil {
+			if !errors.Is(err, os.ErrExist) {
+				log.Fatal().Err(err).Msg("couldn't create a directory")
+			}
+		}
+		log.Debug().Str("dir_path", dirPath).Msg("created directory")
+	}
+
+	var (
+		queue   = make(chan queueItem)
+		fetchWg = new(sync.WaitGroup) // specific to the fetch loop
+		wg      = new(sync.WaitGroup)
+	)
+
+	// Fetching posts to the queue for further download.
+	for _, subreddit := range dl.cliParams.Subreddits {
+		subreddit := subreddit
+
+		fetchWg.Add(1)
+		go func() {
+			defer fetchWg.Done()
+			dl.getPostsLoop(ctx, workdir, subreddit, queue)
+		}()
+	}
+
+	// This functions is responsible for closing the queue after
+	// fetching is done (when all goroutines finish in fetchWg).
+	wg.Add(1)
+	go func() {
+		defer close(queue)
+		defer wg.Done()
+		fetchWg.Wait()
+	}()
+
+	// Downloading posts from the content channel and storing data in files channel.
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		dl.downloadAndSaveLoop(queue)
+	}()
+
+	// Wait until everything finishes.
+	wg.Wait()
+
+	// Close the progressbar
 	if dl.cliParams.ShowProgress {
 		exitChan <- struct{}{}
 	}
@@ -135,8 +157,8 @@ func (dl *Downloader) run(ctx context.Context) Stats {
 }
 
 // getPostsLoop is fetching posts using the (Downloader.client).GetPosts() and sends them to contentCh.
-func (dl *Downloader) getPostsLoop(ctx context.Context, subreddit string, contentOutCh chan<- *media.Content) {
-	log.Debug().Msg("started fetching posts")
+func (dl *Downloader) getPostsLoop(ctx context.Context, basePath, subreddit string, queue chan<- queueItem) {
+	log.Debug().Str("base_path", basePath).Str("subreddit", subreddit).Msg("started fetching posts")
 
 	contentCh := dl.client.GetPostsContent(ctx, dl.cliParams.MediaCount, subreddit)
 
@@ -145,26 +167,30 @@ func (dl *Downloader) getPostsLoop(ctx context.Context, subreddit string, conten
 			continue
 		}
 
+		filename, err := NewFormattedFilename(content.Name, content.Extension)
+		if err != nil {
+			log.Err(err).Msg("couldn't generate filename")
+			continue
+		}
+
+		// The path where the file will be saved.
+		// Using absolute paths allows us to not care
+		// about current working directory.
+		fullname := filepath.Join(basePath, subreddit, filename)
+
+		log.Debug().Str("fullname", fullname).Msg("added file to queue")
+
 		dl.addQueued()
 
-		contentOutCh <- content
+		queue <- queueItem{
+			Fullpath: fullname,
+			Content:  content,
+		}
 	}
 }
 
-func (dl *Downloader) downloadAndSaveLoop(basePath string, contentCh <-chan *media.Content) {
+func (dl *Downloader) downloadAndSaveLoop(queue <-chan queueItem) {
 	log.Debug().Msg("starting download/save loop")
-
-	type Saving struct {
-		Name      string
-		Extension string
-		Bytes     []byte
-	}
-
-	const BufferSize = 8
-
-	saveCh := make(chan *Saving, BufferSize)
-
-	defer close(saveCh)
 
 	wg := new(sync.WaitGroup)
 
@@ -173,36 +199,41 @@ func (dl *Downloader) downloadAndSaveLoop(basePath string, contentCh <-chan *med
 		go func() {
 			defer wg.Done()
 
-			for content := range contentCh {
-				b, err := io.ReadAll(content)
+			for queued := range queue {
+				err := SaveBytesToDisk(queued)
 				if err != nil {
 					dl.addFailed()
-					continue
+				} else {
+					log.Debug().Str("fullpath", queued.Fullpath).Msg("saved to disk")
+					dl.addFinished()
 				}
-
-				content.Close()
-
-				saveCh <- &Saving{
-					Bytes:     b,
-					Name:      content.Name,
-					Extension: content.Extension,
-				}
+				// since the underlying value is a response.Body, we should close it to release resources
+				queued.Content.Close()
 			}
 		}()
 	}
 
-	go func() {
-		for saving := range saveCh {
-			err := SaveBytesToDisk(saving.Bytes, basePath, saving.Name, saving.Extension)
-			if err != nil {
-				dl.addFailed()
-			} else {
-				dl.addFinished()
-			}
-		}
-	}()
-
 	wg.Wait()
+}
+
+func SaveBytesToDisk(item queueItem) error {
+	file, err := os.Create(item.Fullpath)
+	if err != nil {
+		return fmt.Errorf("%w: couldn't save file(name=%s)", err, item.Fullpath)
+	}
+	defer file.Close()
+
+	// Use buffered writes.
+	w := bufio.NewWriter(file)
+	defer w.Flush()
+
+	// Use io.Copy instead of io.ReadAll
+	_, err = io.Copy(file, item.Content)
+	if err != nil {
+		return fmt.Errorf("%w: couldn't save file(name=%s)", err, item.Content.Name)
+	}
+
+	return nil
 }
 
 // printProgressLoop prints the current progress of download every two seconds.
