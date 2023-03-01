@@ -124,21 +124,7 @@ func MustRunCommand(ctx context.Context, cliParams *params.CLIParameters, filter
 		panic(err) // no point in continuing
 	}
 
-	var (
-		statusCh = dler.Download(ctx)
-		finished = 0
-	)
-
-	for message := range statusCh {
-		status, err := message.Status, message.Error
-		if err != nil {
-			log.Err(err).Msg("error during download")
-		}
-
-		if status == downloader.StatusFinished {
-			finished++
-		}
-	}
+	status := dler.Download(ctx)
 
 	fStr := "Finished downloading %d "
 
@@ -151,5 +137,5 @@ func MustRunCommand(ctx context.Context, cliParams *params.CLIParameters, filter
 		fStr += "video(s)"
 	}
 
-	log.Info().Msg(fmt.Sprintf(fStr, finished))
+	log.Info().Msg(fmt.Sprintf(fStr, status.Finished))
 }

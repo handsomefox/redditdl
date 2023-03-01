@@ -21,19 +21,9 @@ func TestDownload(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	statusCh := dl.Download(context.TODO())
-	total := int64(0)
-	for message := range statusCh {
-		status, err := message.Status, message.Error
-		if err != nil {
-			t.Log(err)
-		}
-		if status == downloader.StatusFinished || status == downloader.StatusFailed {
-			total++
-		}
-	}
-	if total < 1 {
-		t.Error("Failed to download requested amount", total, p.MediaCount)
+	status := dl.Download(context.TODO())
+	if status.Finished < 1 {
+		t.Error("Failed to download requested amount", status.Finished, p.MediaCount)
 	}
 }
 
@@ -72,13 +62,7 @@ func Download(b *testing.B, count int64) {
 
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		statusCh := dl.Download(context.TODO())
-		for {
-			_, more := <-statusCh
-			if !more {
-				break
-			}
-		}
+		_ = dl.Download(context.TODO())
 	}
 	b.StopTimer()
 	os.RemoveAll(dir)

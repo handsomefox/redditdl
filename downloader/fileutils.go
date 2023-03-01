@@ -9,6 +9,19 @@ import (
 
 var ErrEmptyFileParams = errors.New("empty parameters provided, can't create a filename")
 
+func SaveBytesToDisk(b []byte, name, extensions string) error {
+	filename, err := NewFormattedFilename(name, extensions)
+	if err != nil {
+		return fmt.Errorf("%w: couldn't save file", err)
+	}
+
+	if err := os.WriteFile(filename, b, 0o600); err != nil {
+		return fmt.Errorf("%w: couldn't save file(name=%s)", err, filename)
+	}
+
+	return nil
+}
+
 // NewFormattedFilename generates a valid filename for the media.
 //
 // It accounts for:

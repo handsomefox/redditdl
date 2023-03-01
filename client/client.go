@@ -96,15 +96,12 @@ func (c *Client) NewContent(ctx context.Context, post media.RedditPost) (*media.
 func (c *Client) GetPostsContent(ctx context.Context, count int64, subreddit string) <-chan *media.Content {
 	const BufferSize = 8
 
-	var (
-		mediaCh  = make(chan *media.Content, BufferSize)
-		loopFunc = func() {
-			defer close(mediaCh)
-			c.postsLoop(ctx, count, subreddit, mediaCh)
-		}
-	)
+	mediaCh := make(chan *media.Content, BufferSize)
 
-	go loopFunc()
+	go func() {
+		defer close(mediaCh)
+		c.postsLoop(ctx, count, subreddit, mediaCh)
+	}()
 
 	return mediaCh
 }
