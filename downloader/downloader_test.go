@@ -1,4 +1,4 @@
-package downloader
+package downloader_test
 
 import (
 	"context"
@@ -6,143 +6,96 @@ import (
 	"path"
 	"testing"
 
-	"github.com/handsomefox/redditdl/client"
+	"github.com/handsomefox/redditdl/cmd"
+	"github.com/handsomefox/redditdl/cmd/params"
+	"github.com/handsomefox/redditdl/downloader"
+	"github.com/handsomefox/redditdl/logging"
 )
 
 func TestDownload(t *testing.T) {
 	t.Parallel()
 
-	clientConfig := &client.Config{
-		Subreddit:   "wallpaper",
-		Sorting:     "best",
-		Timeframe:   "all",
-		Orientation: "",
-		Count:       25,
-		MinWidth:    0,
-		MinHeight:   0,
-	}
+	p := setupConfig(t.TempDir(), 25)
+	log := logging.Get()
 
-	downloaderConfig := &Config{
-		Directory:    os.TempDir(),
-		WorkerCount:  DefaultWorkerCount,
-		ShowProgress: false,
-		ContentType:  ContentAny,
+	dl, err := downloader.New(p, log, downloader.DefaultFilters()...)
+	if err != nil {
+		t.Fatal(err)
 	}
-
-	dl := New(downloaderConfig, clientConfig, DefaultFilters()...)
 
 	statusCh := dl.Download(context.TODO())
-
 	total := int64(0)
-
 	for message := range statusCh {
 		status, err := message.Status, message.Error
 		if err != nil {
 			t.Log(err)
 		}
-		t.Log(status)
-
-		if status == StatusFinished || status == StatusFailed {
+		if status == downloader.StatusFinished || status == downloader.StatusFailed {
 			total++
 		}
 	}
-
-	if total != clientConfig.Count {
-		t.Error("Failed to download requested amount", total, clientConfig.Count)
+	if total != p.MediaCount {
+		t.Error("Failed to download requested amount", total, p.MediaCount)
 	}
 }
 
-func setupConfig(dir string, count int64) (*Config, *client.Config) {
+func setupConfig(dir string, count int64) *params.CLIParameters {
 	os.Setenv("ENVIRONMENT", "PRODUCTION")
-	clientConfig := &client.Config{
-		Subreddit:   "wallpaper",
-		Sorting:     "best",
-		Timeframe:   "all",
-		Orientation: "",
-		Count:       count,
-		MinWidth:    0,
-		MinHeight:   0,
+	cliParams := &params.CLIParameters{
+		Sort:             "best",
+		Timeframe:        "all",
+		Directory:        dir,
+		Subreddits:       []string{"wallpaper"},
+		MediaMinWidth:    0,
+		MediaMinHeight:   0,
+		MediaCount:       count,
+		MediaOrientation: params.RequiredOrientationAny,
+		ContentType:      params.RequiredContentTypeImages,
+		ShowProgress:     false,
+		VerboseLogging:   false,
 	}
-	downloaderConfig := &Config{
-		Directory:    dir,
-		WorkerCount:  DefaultWorkerCount,
-		ShowProgress: false,
-		ContentType:  ContentImages,
+	cmd.SetGlobalLoggingLevel(false)
+	return cliParams
+}
+
+func Download(b *testing.B, count int64) {
+	b.StopTimer()
+
+	dir, err := os.MkdirTemp("", "")
+	if err != nil {
+		b.Fatal(err)
 	}
-	return downloaderConfig, clientConfig
+
+	p := setupConfig(dir, count)
+	dl, err := downloader.New(p, logging.Get(), downloader.DefaultFilters()...)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		statusCh := dl.Download(context.TODO())
+		for {
+			_, more := <-statusCh
+			if !more {
+				break
+			}
+		}
+	}
+	b.StopTimer()
+	os.RemoveAll(dir)
 }
 
 func BenchmarkDownload1(b *testing.B) {
-	b.StopTimer()
-
-	dir, err := os.MkdirTemp("", "")
-	if err != nil {
-		b.Fatal(err)
-	}
-
-	dcfg, ccfg := setupConfig(dir, 1)
-	dl := New(dcfg, ccfg, DefaultFilters()...)
-
-	b.StartTimer()
-	for i := 0; i < b.N; i++ {
-		statusCh := dl.Download(context.TODO())
-		for {
-			_, more := <-statusCh
-			if !more {
-				break
-			}
-		}
-	}
-	b.StopTimer()
-	os.RemoveAll(dir)
+	Download(b, 1)
 }
 
 func BenchmarkDownload25(b *testing.B) {
-	b.StopTimer()
-
-	dir, err := os.MkdirTemp("", "")
-	if err != nil {
-		b.Fatal(err)
-	}
-
-	dcfg, ccfg := setupConfig(dir, 25)
-	dl := New(dcfg, ccfg, DefaultFilters()...)
-
-	b.StartTimer()
-	for i := 0; i < b.N; i++ {
-		statusCh := dl.Download(context.TODO())
-		for {
-			_, more := <-statusCh
-			if !more {
-				break
-			}
-		}
-	}
-	b.StopTimer()
-	os.RemoveAll(dir)
+	Download(b, 25)
 }
 
 func BenchmarkDownload100(b *testing.B) {
-	dir, err := os.MkdirTemp("", "")
-	if err != nil {
-		b.Fatal(err)
-	}
-
-	dcfg, ccfg := setupConfig(dir, 100)
-	dl := New(dcfg, ccfg, DefaultFilters()...)
-
-	b.StartTimer()
-	for i := 0; i < b.N; i++ {
-		statusCh := dl.Download(context.TODO())
-		for {
-			_, more := <-statusCh
-			if !more {
-				break
-			}
-		}
-	}
-	b.StopTimer()
-	os.RemoveAll(dir)
+	Download(b, 100)
 }
 
 func TestNewFilename(t *testing.T) {
@@ -195,7 +148,7 @@ func TestNewFilename(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := NewFilename(tt.args.name, tt.args.extension)
+			got, err := downloader.NewFilename(tt.args.name, tt.args.extension)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewFilename() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -240,7 +193,7 @@ func TestExists(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			if got := FileExists(tt.args.filename); got != tt.want {
+			if got := downloader.FileExists(tt.args.filename); got != tt.want {
 				t.Errorf("Exists() = %v, want %v", got, tt.want)
 			}
 		})
@@ -285,7 +238,7 @@ func TestNavigateTo(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			if err := NavigateTo(tt.args.dir, tt.args.createDir); (err != nil) != tt.wantErr {
+			if err := downloader.NavigateTo(tt.args.dir, tt.args.createDir); (err != nil) != tt.wantErr {
 				t.Errorf("NavigateTo() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -349,7 +302,7 @@ func TestIsValidURL(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			if got := isValidURL(tt.args.str); got != tt.want {
+			if got := downloader.IsValidURL(tt.args.str); got != tt.want {
 				t.Errorf("IsURL() = %v, want %v", got, tt.want)
 			}
 		})
