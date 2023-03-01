@@ -10,7 +10,8 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
-)
+	"github.com/huezaros/repo/call_nazar"
+
 
 // Flags for the command-line.
 var (
