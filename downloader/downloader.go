@@ -139,7 +139,7 @@ func (dl *Downloader) run(ctx context.Context) Stats {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			dl.downloadAndSaveLoop(ctx, contentCh)
+			dl.downloadAndSaveLoop(contentCh)
 		}()
 		wg.Wait()
 	}
@@ -171,7 +171,7 @@ func (dl *Downloader) getPostsLoop(ctx context.Context, subreddit string, conten
 	}
 }
 
-func (dl *Downloader) downloadAndSaveLoop(ctx context.Context, contentCh <-chan *media.Content) {
+func (dl *Downloader) downloadAndSaveLoop(contentCh <-chan *media.Content) {
 	log.Debug().Msg("starting download/save loop")
 
 	type Saving struct {
@@ -192,6 +192,7 @@ func (dl *Downloader) downloadAndSaveLoop(ctx context.Context, contentCh <-chan 
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+
 			for content := range contentCh {
 				b, err := io.ReadAll(content)
 				if err != nil {
