@@ -9,16 +9,14 @@ import (
 	"github.com/handsomefox/redditdl/cmd"
 	"github.com/handsomefox/redditdl/cmd/params"
 	"github.com/handsomefox/redditdl/downloader"
-	"github.com/handsomefox/redditdl/logging"
 )
 
 func TestDownload(t *testing.T) {
 	t.Parallel()
 
 	p := setupConfig(t.TempDir(), 25)
-	log := logging.Get()
 
-	dl, err := downloader.New(p, log, downloader.DefaultFilters()...)
+	dl, err := downloader.New(p, downloader.DefaultFilters()...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -40,7 +38,7 @@ func TestDownload(t *testing.T) {
 }
 
 func setupConfig(dir string, count int64) *params.CLIParameters {
-	os.Setenv("ENVIRONMENT", "PRODUCTION")
+	cmd.SetGlobalLoggingLevel(false)
 	cliParams := &params.CLIParameters{
 		Sort:             "best",
 		Timeframe:        "all",
@@ -54,7 +52,6 @@ func setupConfig(dir string, count int64) *params.CLIParameters {
 		ShowProgress:     false,
 		VerboseLogging:   false,
 	}
-	cmd.SetGlobalLoggingLevel(false)
 	return cliParams
 }
 
@@ -68,7 +65,7 @@ func Download(b *testing.B, count int64) {
 	}
 
 	p := setupConfig(dir, count)
-	dl, err := downloader.New(p, logging.Get(), downloader.DefaultFilters()...)
+	dl, err := downloader.New(p, downloader.DefaultFilters()...)
 	if err != nil {
 		b.Fatal(err)
 	}

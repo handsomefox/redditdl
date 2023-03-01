@@ -7,7 +7,8 @@ import (
 
 	"github.com/handsomefox/redditdl/cmd/params"
 	"github.com/handsomefox/redditdl/downloader"
-	"github.com/handsomefox/redditdl/logging"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 )
 
@@ -94,16 +95,12 @@ func init() {
 		Flags().Bool("nsfw", true, "If true, NSFW content will be ignored")
 }
 
+// SetGlobalLoggingLevel changes the zerolog.Log level.
 func SetGlobalLoggingLevel(verbose bool) {
-	// Package logging using an env variable for the logger.
 	if verbose {
-		if err := os.Setenv("ENVIRONMENT", "DEVELOPMENT"); err != nil {
-			panic(err)
-		}
+		log.Logger = log.Logger.Level(zerolog.DebugLevel)
 	} else {
-		if err := os.Setenv("ENVIRONMENT", "PRODUCTION"); err != nil {
-			panic(err)
-		}
+		log.Logger = log.Logger.Level(zerolog.InfoLevel)
 	}
 }
 
@@ -111,31 +108,36 @@ func MustRunCommand(ctx context.Context, p *params.CLIParameters, filters ...dow
 	if p == nil {
 		panic("nil parameters provided")
 	}
+
 	SetGlobalLoggingLevel(p.VerboseLogging)
 
-	log := logging.Get()
-	// Print the configuration
-	log.Debugf("Using parameters: %#v", p)
-	// Download the media
-	log.Info("Started downloading content")
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
-	dl, err := downloader.New(p, log, filters...)
+	// Print the configuration
+	log.Debug().Any("configuration", *p).Send()
+	// Download the media
+	log.Info().Msg("started downloading content")
+
+	dl, err := downloader.New(p, filters...)
 	if err != nil {
 		panic(err) // no point in continuing
 	}
+
 	var (
 		statusCh = dl.Download(ctx)
 		finished = 0
 	)
+
 	for message := range statusCh {
 		status, err := message.Status, message.Error
 		if err != nil {
-			log.Error("error during download=", err.Error())
+			log.Err(err).Msg("error during download")
 		}
 		if status == downloader.StatusFinished {
 			finished++
 		}
 	}
+
 	fStr := "Finished downloading %d "
 	switch p.ContentType {
 	case params.RequiredContentTypeAny:
@@ -145,5 +147,6 @@ func MustRunCommand(ctx context.Context, p *params.CLIParameters, filters ...dow
 	case params.RequiredContentTypeVideos:
 		fStr += "video(s)"
 	}
-	log.Infof(fStr, finished)
+
+	log.Info().Msg(fmt.Sprintf(fStr, finished))
 }

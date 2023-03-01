@@ -15,7 +15,7 @@ import (
 	"github.com/handsomefox/redditdl/client"
 	"github.com/handsomefox/redditdl/client/media"
 	"github.com/handsomefox/redditdl/cmd/params"
-	"go.uber.org/zap"
+	"github.com/rs/zerolog/log"
 )
 
 var (
@@ -44,13 +44,12 @@ type StatusMessage struct {
 type Downloader struct {
 	currProgress struct{ queued, finished, failed atomic.Int64 }
 	cliParams    *params.CLIParameters
-	log          *zap.SugaredLogger
 	client       *client.Client
 	filters      []Filter
 	workerCount  int
 }
 
-func New(cliParams *params.CLIParameters, logger *zap.SugaredLogger, filters ...Filter) (*Downloader, error) {
+func New(cliParams *params.CLIParameters, filters ...Filter) (*Downloader, error) {
 	if cliParams == nil {
 		return nil, fmt.Errorf("no params provided")
 	}
@@ -59,7 +58,6 @@ func New(cliParams *params.CLIParameters, logger *zap.SugaredLogger, filters ...
 		wc = 1
 	}
 	return &Downloader{
-		log:         logger,
 		cliParams:   cliParams,
 		client:      client.NewClient(cliParams.Sort, cliParams.Timeframe),
 		filters:     filters,
@@ -69,7 +67,7 @@ func New(cliParams *params.CLIParameters, logger *zap.SugaredLogger, filters ...
 
 // Download return a channel used to communicate download status (started, finished, failed, errors (if any)).
 func (dl *Downloader) Download(ctx context.Context) <-chan StatusMessage {
-	dl.log.Debug(dl.cliParams)
+	log.Debug().Any("parameters", dl.cliParams).Send()
 	statusCh := make(chan StatusMessage, 16)
 	go func() {
 		defer close(statusCh)
@@ -87,7 +85,7 @@ func (dl *Downloader) run(ctx context.Context, statusCh chan<- StatusMessage) {
 
 	wd, err := os.Getwd()
 	if err != nil {
-		dl.log.Error("cannot get working directory", err)
+		log.Err(err).Msg("cannot get working directory")
 		return
 	}
 
@@ -101,12 +99,12 @@ func (dl *Downloader) run(ctx context.Context, statusCh chan<- StatusMessage) {
 		// Navigate to original directory.
 		err := NavigateTo(wd, true)
 		if err != nil {
-			dl.log.Error("failed to navigate to working directory ", err)
+			log.Err(err).Msg("failed to navigate to working directory")
 			return
 		}
 		// Change directory to specific subreddit.
 		if err := NavigateTo(subreddit, true); err != nil {
-			dl.log.Error("failed to navigate to subreddit directory ", err)
+			log.Err(err).Msg("failed to navigate to subreddit directory")
 			return
 		}
 		// Start the download
@@ -136,7 +134,7 @@ func (dl *Downloader) run(ctx context.Context, statusCh chan<- StatusMessage) {
 
 // postsLoop is fetching posts using the (Downloader.client).GetPosts() and sends them to contentCh.
 func (dl *Downloader) postsLoop(ctx context.Context, subreddit string, contentCh chan<- *media.Content, statusCh chan<- StatusMessage) {
-	dl.log.Debug("started fetching posts")
+	log.Debug().Msg("started fetching posts")
 	cnts := dl.client.GetPostsContent(ctx, dl.cliParams.MediaCount, subreddit)
 	for content := range cnts {
 		if IsFiltered(dl.cliParams, *content, dl.filters...) {
@@ -149,7 +147,7 @@ func (dl *Downloader) postsLoop(ctx context.Context, subreddit string, contentCh
 }
 
 func (dl *Downloader) downloadAndSaveLoop(ctx context.Context, contentCh <-chan *media.Content, statusCh chan<- StatusMessage) {
-	dl.log.Debug("starting download/save loop")
+	log.Debug().Msg("starting download/save loop")
 	var (
 		wg     = new(sync.WaitGroup)
 		diskMu = new(sync.Mutex) // locked when the goroutine is saving the file to a disk
@@ -193,7 +191,7 @@ func saveContent(b []byte, content *media.Content) error {
 
 // progressLoop prints the current progress of download every two seconds.
 func (dl *Downloader) progressLoop(exitCh <-chan struct{}) {
-	dl.log.Debug("started the progress loop")
+	log.Debug().Msg("started the progress loop")
 	const fStr = "Current progress: queued=%d, finished=%d, failed=%d"
 	for {
 		select {
@@ -201,7 +199,7 @@ func (dl *Downloader) progressLoop(exitCh <-chan struct{}) {
 			return
 		default:
 			p := &dl.currProgress
-			dl.log.Infof(fStr, p.queued.Load(), p.finished.Load(), p.failed.Load())
+			log.Info().Msg(fmt.Sprintf(fStr, p.queued.Load(), p.finished.Load(), p.failed.Load()))
 			time.Sleep(time.Second)
 		}
 	}
