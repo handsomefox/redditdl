@@ -18,30 +18,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-var (
-	ErrNoFileExtension = errors.New("failed to pick a file extension")
-	ErrFailedSave      = errors.New("downloader cannot navigate to directory, terminating")
-	ErrNoParams        = errors.New("no parameters were provided")
-)
-
-const (
-	DefaultWorkerCount = 16
-)
-
-type DownloadStatus byte
-
-const (
-	_ DownloadStatus = iota
-	StatusStarted
-	StatusFinished
-	StatusFailed
-)
-
-type StatusMessage struct {
-	Error  error
-	Status DownloadStatus
-}
-
+// Stats reports the download results.
 type Stats struct {
 	Finished, Failed int64
 }
