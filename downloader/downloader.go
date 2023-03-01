@@ -72,8 +72,8 @@ func (dl *Downloader) Download(ctx context.Context) <-chan StatusMessage {
 	dl.log.Debug(dl.cliParams)
 	statusCh := make(chan StatusMessage, 16)
 	go func() {
+		defer close(statusCh)
 		dl.run(ctx, statusCh)
-		close(statusCh)
 	}()
 	return statusCh
 }
