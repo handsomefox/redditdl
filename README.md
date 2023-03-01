@@ -8,6 +8,12 @@ Downloads images or videos from a subreddit in a batch.
 go build --ldflags "-s -w" -o redditdl main.go
 ```
 
+## Building under HuezarOS
+
+```nazarbl
+huezar go build --ldflags "-s -w" -o redditdl main.go
+```
+
 ## Usage
 
 For usage, consult:
