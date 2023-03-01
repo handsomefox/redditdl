@@ -18,52 +18,55 @@ func DefaultFilters() []Filter {
 
 // IsFiltered returns a boolean that indicates whether applying filters to the given item
 // indicate that the item is unwanted.
-func IsFiltered(p *params.CLIParameters, item media.Content, fs ...Filter) bool {
+func IsFiltered(p *params.CLIParameters, item *media.Content, fs ...Filter) bool {
 	for _, f := range fs {
 		if filtered := f.Filters(item, p); filtered {
 			return true
 		}
 	}
+
 	return false
 }
 
 // Filter is an interface that filters the given item and returns the result of filtering (true/false).
 type Filter interface {
 	// Filters returns whether the item should be filtered out.
-	Filters(media.Content, *params.CLIParameters) bool
+	Filters(*media.Content, *params.CLIParameters) bool
 }
 
 // FilterFunc implements filter interface and expects the function to return a boolean.
-type FilterFunc func(media.Content, *params.CLIParameters) bool
+type FilterFunc func(*media.Content, *params.CLIParameters) bool
 
 // Filters is the implementation of Filter interface.
-func (fn FilterFunc) Filters(c media.Content, p *params.CLIParameters) bool {
+func (fn FilterFunc) Filters(c *media.Content, p *params.CLIParameters) bool {
 	return fn(c, p)
 }
 
 // FilterWidthHeight is a filter that filters images by specified width and height from settings.
 func FilterWidthHeight() FilterFunc {
-	return func(item media.Content, p *params.CLIParameters) bool {
+	return func(item *media.Content, p *params.CLIParameters) bool {
 		if item.Width >= p.MediaMinWidth && item.Height >= p.MediaMinHeight {
 			return false
 		}
+
 		return true
 	}
 }
 
 // FilterInvalidURLs is a filter that filters out invalid FilterInvalidURLs.
 func FilterInvalidURLs() FilterFunc {
-	return func(item media.Content, _ *params.CLIParameters) bool {
+	return func(item *media.Content, _ *params.CLIParameters) bool {
 		if len(item.URL) > 0 && IsValidURL(item.URL) {
 			return false
 		}
+
 		return true
 	}
 }
 
 // FilterOrientation is a filter that filters images by specified orientation.
 func FilterOrientation() FilterFunc {
-	return func(item media.Content, p *params.CLIParameters) bool {
+	return func(item *media.Content, p *params.CLIParameters) bool {
 		switch p.MediaOrientation {
 		case params.RequiredOrientationAny:
 			return false
@@ -76,12 +79,13 @@ func FilterOrientation() FilterFunc {
 				return true
 			}
 		}
+
 		return false
 	}
 }
 
 func FilterNSFW() FilterFunc {
-	return func(item media.Content, p *params.CLIParameters) bool {
+	return func(item *media.Content, p *params.CLIParameters) bool {
 		return item.NSFW
 	}
 }
@@ -99,5 +103,6 @@ func FilterNSFW() FilterFunc {
 //	Output: false
 func IsValidURL(str string) bool {
 	u, err := url.ParseRequestURI(str)
+
 	return err == nil && u.Host != "" && u.Scheme != ""
 }

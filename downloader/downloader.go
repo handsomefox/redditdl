@@ -137,7 +137,7 @@ func (dl *Downloader) postsLoop(ctx context.Context, subreddit string, contentCh
 	log.Debug().Msg("started fetching posts")
 	cnts := dl.client.GetPostsContent(ctx, dl.cliParams.MediaCount, subreddit)
 	for content := range cnts {
-		if IsFiltered(dl.cliParams, *content, dl.filters...) {
+		if IsFiltered(dl.cliParams, content, dl.filters...) {
 			continue
 		}
 		dl.currProgress.queued.Add(1)
