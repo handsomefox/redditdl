@@ -64,7 +64,7 @@ func New(cliParams *params.CLIParameters, filters ...Filter) (*Downloader, error
 		return nil, ErrNoParams
 	}
 
-	workerCount := runtime.NumCPU() % int(cliParams.MediaCount)
+	workerCount := (2 * runtime.NumCPU()) % int(cliParams.MediaCount)
 	if workerCount <= 0 {
 		workerCount = 1
 	}
