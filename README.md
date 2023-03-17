@@ -10,7 +10,7 @@ go build --ldflags "-s -w" -o redditdl main.go
 
 ## Usage
 
-For usage, consult:
+For usage, consult the args.go file, or run
 
 ```bash
 redditdl --help
