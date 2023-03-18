@@ -112,7 +112,7 @@ func (s *Saver) Run() error {
 	}
 
 	for res := range stream {
-		if s.totalWithoutSkipped() >= s.args.MediaCount {
+		if s.totalWithoutSkipped() >= s.args.MediaCount && s.queued.Load() == 0 {
 			terminate <- struct{}{}
 			return nil
 		}
@@ -159,7 +159,7 @@ func (s *Saver) downloadLoop(ctx context.Context, wd string) {
 			continue
 		}
 
-		if s.totalWithoutSkipped() < s.args.MediaCount {
+		if s.totalWithoutSkipped() < s.args.MediaCount && s.queued.Load() > 0 {
 			s.saveQueue <- SaverItem{
 				Data: item,
 				Path: filepath.Join(wd, strings.ToLower(post.Data.Subreddit), filename),
