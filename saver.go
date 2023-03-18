@@ -1,8 +1,11 @@
 package main
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -212,15 +215,22 @@ func (s *Saver) progressLoop() {
 func (s *Saver) WriteFile(path string, b []byte) error {
 	file, err := os.Create(path)
 	if err != nil {
-		log.Info().Msg(path)
+		log.Debug().Msg(path)
 		return err
 	}
 	defer file.Close()
-	n, err := file.Write(b)
+
+	fw := bufio.NewWriter(file)
+	defer fw.Flush()
+
+	br := bytes.NewBuffer(b)
+
+	n, err := io.Copy(fw, br)
 	if err != nil {
 		return err
 	}
-	log.Debug().Int("written_bytes", n).Str("path", path).Msg("wrote to disk")
+
+	log.Debug().Int64("written_bytes", n).Str("path", path).Msg("wrote to disk")
 
 	return nil
 }
