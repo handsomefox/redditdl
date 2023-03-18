@@ -17,8 +17,8 @@ type AppArguments struct {
 
 	MediaCount       int64  `arg:"-c, --count" help:"amount of media to download"`
 	MediaOrientation string `arg:"-o, --orientation" help:"values: landspace/portrait/rect/all" default:"all"`
-	MediaWidth       int    `arg:"-w, --width" help:"minimal content width"`
-	MediaHeight      int    `arg:"-h, --height" help:"minimal content height"`
+	MediaWidth       int    `arg:"-x, --width" help:"minimal content width"`
+	MediaHeight      int    `arg:"-y, --height" help:"minimal content height"`
 
 	SaveDirectory string `arg:"-d, --dir" help:"output path"`
 
