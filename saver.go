@@ -1,0 +1,209 @@
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
+
+	"github.com/handsomefox/redditdl/api"
+	"github.com/rs/zerolog/log"
+)
+
+type SaverItem struct {
+	Data *api.Item
+	Path string
+}
+
+type Saver struct {
+	client        *api.Client
+	args          *AppArguments
+	downloadQueue chan *api.Post
+	saveQueue     chan SaverItem
+	saved, failed atomic.Int64
+}
+
+func NewSaver(args *AppArguments) *Saver {
+	return &Saver{
+		client:        api.DefaultClient(),
+		args:          args,
+		downloadQueue: make(chan *api.Post, 24),
+		saveQueue:     make(chan SaverItem, 24),
+		saved:         atomic.Int64{},
+		failed:        atomic.Int64{},
+	}
+}
+
+func (s *Saver) Run() error {
+	if err := ChdirOrCreate(s.args.SaveDirectory, true); err != nil {
+		return err
+	}
+
+	wd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+
+	subreddits := strings.Split(s.args.SubredditList, ",")
+	for i := 0; i < len(subreddits); i++ {
+		subreddits[i] = strings.TrimSpace(subreddits[i])
+		log.Debug().Str("subreddit", subreddits[i]).Msg("adding subreddit")
+		if err := os.Mkdir(filepath.Join(wd, subreddits[i]), os.ModePerm); err != nil { // create paths beforehand
+			if err == os.ErrExist {
+				continue
+			}
+			return err
+		}
+	}
+
+	if s.args.ProgressLogging {
+		go s.progressLoop()
+	}
+
+	opts := &api.Options{
+		ContentType: s.args.SubredditContentType,
+		Sort:        s.args.SubredditSort,
+		Timeframe:   s.args.SubredditTimeframe,
+		ShowNSFW:    s.args.SubredditShowNSFW,
+	}
+	log.Debug().Any("args", opts).Send()
+
+	streamer, err := api.NewRedditStreamer(s.client, opts, subreddits...)
+	if err != nil {
+		return err
+	}
+
+	ctx := context.Background()
+	wg := new(sync.WaitGroup)
+
+	for i := 0; i < 24; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			s.downloadLoop(ctx, wd)
+		}()
+	}
+	defer close(s.downloadQueue)
+
+	go s.saveLoop()
+	defer close(s.saveQueue)
+
+	terminate := make(chan struct{})
+	defer close(terminate)
+
+	stream, err := streamer.Stream(ctx, terminate)
+	if err != nil {
+		return err
+	}
+
+	for res := range stream {
+		if s.failed.Load()+s.saved.Load() >= s.args.MediaCount {
+			terminate <- struct{}{}
+			break
+		}
+		if res.Error != nil {
+			log.Err(res.Error)
+			continue
+		}
+		s.downloadQueue <- res.Post
+	}
+
+	return nil
+}
+
+func (s *Saver) downloadLoop(ctx context.Context, wd string) {
+	log.Debug().Msg("started the save loop")
+
+	for post := range s.downloadQueue {
+		if post.Type() != s.args.SubredditContentType {
+			log.Debug().
+				Str("want_content_type", s.args.SubredditContentType).
+				Str("got_content_type", post.Type()).
+				Msg("unexpected content_type")
+			continue
+		}
+		if s.args.SubredditContentType == "image" || s.args.SubredditContentType == "video" {
+			item, err := s.client.Subreddit.PostToItem(ctx, post)
+			if err != nil {
+				log.Err(err).Msg("failed to convert a post to an item")
+				s.failed.Add(1)
+				continue
+			}
+
+			// item path is:
+			// {working_directory}/{subreddit}/{item_name}.{item_extension}
+			filename, err := NewFormattedFilename(item.Name, item.Extension)
+			if err != nil {
+				log.Err(err).Str("item_name", item.Name).Msg("failed to save item")
+				s.failed.Add(1)
+				continue
+			}
+
+			s.saveQueue <- SaverItem{
+				Data: item,
+				Path: filepath.Join(wd, post.Data.Subreddit, filename),
+			}
+
+		} else {
+			log.Debug().Str("content_type", s.args.SubredditContentType).Msg("unexpected content type")
+			s.failed.Add(1)
+			continue
+		}
+
+	}
+}
+
+func (s *Saver) saveLoop() {
+	for item := range s.saveQueue {
+		if err := s.WriteFile(item.Path, item.Data.Bytes); err != nil {
+			s.failed.Add(1)
+			log.Err(err).Msg("failed to write file to disk")
+		} else {
+			s.saved.Add(1)
+		}
+	}
+}
+
+func (s *Saver) progressLoop() {
+	// printProgressLoop prints the current progress of download every two seconds.
+	log.Debug().Msg("started the progress loop")
+	var (
+		lastTotal = int64(0)
+		stringf   = "Download status: Saved=%d; Failed=%d"   // Specified format string for printing
+		print     = func(msg string) { log.Info().Msg(msg) } // Function used for printing (by default, zerolog)
+	)
+	if !s.args.VerboseLogging {
+		stringf = "Download status: Saved=%d; Failed=%d\r" // if no logging will be done, we can take control and print in a single line.
+		print = func(msg string) { fmt.Print(msg) }        // Use package fmt for carriage return working correctly
+	}
+	for {
+		saved := s.saved.Load()
+		failed := s.failed.Load()
+		if lastTotal < saved+failed {
+			print(fmt.Sprintf(stringf, saved, failed))
+			lastTotal = saved + failed
+		}
+		// No need to update all the time
+		time.Sleep(time.Millisecond + 500)
+	}
+}
+
+func (s *Saver) WriteFile(path string, b []byte) error {
+	file, err := os.Create(path)
+	if err != nil {
+		log.Info().Msg(path)
+		return err
+	}
+	defer file.Close()
+	n, err := file.Write(b)
+	if err != nil {
+		return err
+	}
+	log.Debug().Int("written_bytes", n).Str("path", path).Msg("wrote to disk")
+
+	return nil
+}
