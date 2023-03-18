@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"runtime"
 
 	"github.com/rs/zerolog/log"
 )
@@ -36,6 +37,13 @@ type StreamError struct {
 	explanation string
 }
 
+// Indicates that stream has ended
+type StreamEOF string
+
+func (s StreamEOF) Error() string {
+	return string(s)
+}
+
 func (se *StreamError) Error() string {
 	if se.err != nil {
 		return se.explanation + ": " + se.err.Error()
@@ -54,6 +62,8 @@ type RedditStreamer struct {
 	client     *Client
 	opts       *Options
 	subreddits []string
+
+	completed chan struct{}
 }
 
 func NewRedditStreamer(client *Client, opts *Options, subreddits ...string) (Streamer, error) {
@@ -64,6 +74,7 @@ func NewRedditStreamer(client *Client, opts *Options, subreddits ...string) (Str
 		client:     client,
 		opts:       opts,
 		subreddits: subreddits,
+		completed:  make(chan struct{}),
 	}
 
 	return rs, nil
@@ -87,12 +98,32 @@ func (rs *RedditStreamer) Stream(ctx context.Context, terminate <-chan struct{})
 	}
 
 	go func() {
-		// This goroutine just blocks until termination is received and then reports to other goroutines.
-		// It also closes the item channel, the caller only needs to signal termination.
-		<-terminate
 		defer close(c)
-		for i := 0; i < len(signals); i++ {
-			signals[i] <- struct{}{}
+		defer func() {
+			for i := 0; i < len(signals); i++ {
+				signals[i] <- struct{}{}
+			}
+		}()
+		completed := 0
+		for {
+			select {
+			// This waits until terminnation is received and then reports to other goroutines.
+			// It also closes the item channel, the caller only needs to signal termination.
+			case <-terminate:
+				return
+			// This will watch for the runners (if they run out of posts to download)
+			// When all of them complete, rs.completed will be equal to len(rs.subreddits)
+			case <-rs.completed:
+				completed++
+				if completed == len(rs.subreddits) {
+					// All of the runners finished
+					c <- StreamResult{Error: StreamEOF("all of the runners finished")}
+					return
+				}
+				// Yield the CPU for other goroutines
+			default:
+				runtime.Gosched()
+			}
 		}
 	}()
 
@@ -106,16 +137,25 @@ func (rs *RedditStreamer) run(ctx context.Context, results chan<- StreamResult, 
 	defer close(terminate)
 
 	var after string
+	var completed bool
 
 	for {
 		select {
 		case <-terminate:
 			return
 		default:
+			if completed {
+				runtime.Gosched()
+			}
 			after2, err := rs.fetchPost(ctx, after, subreddit, results)
 			if err != nil {
 				if _, ok := err.(*StreamError); ok {
 					log.Info().Str("subreddit", subreddit).Msg("no more posts to fetch")
+				} else if _, ok := err.(StreamEOF); ok {
+					rs.completed <- struct{}{}
+					completed = true
+				} else {
+					log.Err(err)
 				}
 			} else {
 				after = after2
@@ -138,6 +178,10 @@ func (rs *RedditStreamer) fetchPost(ctx context.Context, after, subreddit string
 	if err != nil {
 		log.Err(err).Msg("error when fetching an item")
 		return "", err
+	}
+
+	if len(res) == 0 {
+		return "", StreamEOF("no more posts to read")
 	}
 
 	for i := 0; i < len(res); i++ {
