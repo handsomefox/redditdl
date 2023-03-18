@@ -20,11 +20,11 @@ type SaverItem struct {
 }
 
 type Saver struct {
-	client        *api.Client
-	args          *AppArguments
-	downloadQueue chan *api.Post
-	saveQueue     chan SaverItem
-	saved, failed atomic.Int64
+	client                *api.Client
+	args                  *AppArguments
+	downloadQueue         chan *api.Post
+	saveQueue             chan SaverItem
+	queued, saved, failed atomic.Int64
 }
 
 func NewSaver(args *AppArguments) *Saver {
@@ -120,8 +120,7 @@ func (s *Saver) downloadLoop(ctx context.Context, wd string) {
 
 	for post := range s.downloadQueue {
 		if !s.isEligibleForSaving(post) {
-			log.Debug().Str("content_type", s.args.SubredditContentType).Msg("unexpected content type")
-			s.failed.Add(1)
+			log.Debug().Msg("skipped an item")
 			continue
 		}
 
@@ -145,6 +144,8 @@ func (s *Saver) downloadLoop(ctx context.Context, wd string) {
 			Data: item,
 			Path: filepath.Join(wd, post.Data.Subreddit, filename),
 		}
+
+		s.queued.Add(1)
 	}
 }
 
@@ -156,6 +157,7 @@ func (s *Saver) saveLoop() {
 		} else {
 			s.saved.Add(1)
 		}
+		s.queued.Store(s.queued.Load() - 1)
 	}
 }
 
@@ -164,19 +166,20 @@ func (s *Saver) progressLoop() {
 	log.Debug().Msg("started the progress loop")
 	var (
 		lastTotal = int64(0)
-		stringf   = "Download status: Saved=%d; Failed=%d"   // Specified format string for printing
-		print     = func(msg string) { log.Info().Msg(msg) } // Function used for printing (by default, zerolog)
+		stringf   = "Download status: Queued=%d; Saved=%d; Failed=%d" // Specified format string for printing
+		print     = func(msg string) { log.Info().Msg(msg) }          // Function used for printing (by default, zerolog)
 	)
 	if !s.args.VerboseLogging {
-		stringf = "Download status: Saved=%d; Failed=%d\r" // if no logging will be done, we can take control and print in a single line.
-		print = func(msg string) { fmt.Print(msg) }        // Use package fmt for carriage return working correctly
+		stringf = "Download status: Queued=%d; Saved=%d; Failed=%d\r" // if no logging will be done, we can take control and print in a single line.
+		print = func(msg string) { fmt.Print(msg) }                   // Use package fmt for carriage return working correctly
 	}
 	for {
 		saved := s.saved.Load()
 		failed := s.failed.Load()
-		if lastTotal < saved+failed {
-			print(fmt.Sprintf(stringf, saved, failed))
-			lastTotal = saved + failed
+		queued := s.queued.Load()
+		if lastTotal < saved+failed+queued {
+			print(fmt.Sprintf(stringf, queued, saved, failed))
+			lastTotal = saved + failed + queued
 		}
 		// No need to update all the time
 		time.Sleep(time.Millisecond + 500)
