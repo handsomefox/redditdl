@@ -156,7 +156,7 @@ func (s *Saver) downloadLoop(ctx context.Context, wd string) {
 		if s.totalWithoutSkipped() < s.args.MediaCount {
 			s.saveQueue <- SaverItem{
 				Data: item,
-				Path: filepath.Join(wd, post.Data.Subreddit, filename),
+				Path: filepath.Join(wd, strings.ToLower(post.Data.Subreddit), filename),
 			}
 		} else {
 			return
