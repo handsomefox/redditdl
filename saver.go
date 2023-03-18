@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -60,11 +61,13 @@ func (s *Saver) Run() error {
 	for i := 0; i < len(subreddits); i++ {
 		subreddits[i] = strings.TrimSpace(subreddits[i])
 		log.Debug().Str("subreddit", subreddits[i]).Msg("adding subreddit")
-		if err := os.Mkdir(filepath.Join(wd, strings.ToLower(subreddits[i])), os.ModePerm); err != nil { // create paths beforehand
-			if err == os.ErrExist {
+		dir := filepath.Join(wd, strings.ToLower(subreddits[i]))
+		if err := os.Mkdir(dir, os.ModePerm); err != nil {
+			if !errors.Is(err, os.ErrExist) {
+				log.Err(err).Send()
+			} else {
 				continue
 			}
-			return err
 		}
 	}
 
