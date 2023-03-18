@@ -60,7 +60,7 @@ func (s *Saver) Run() error {
 	for i := 0; i < len(subreddits); i++ {
 		subreddits[i] = strings.TrimSpace(subreddits[i])
 		log.Debug().Str("subreddit", subreddits[i]).Msg("adding subreddit")
-		if err := os.Mkdir(filepath.Join(wd, subreddits[i]), os.ModePerm); err != nil { // create paths beforehand
+		if err := os.Mkdir(filepath.Join(wd, strings.ToLower(subreddits[i])), os.ModePerm); err != nil { // create paths beforehand
 			if err == os.ErrExist {
 				continue
 			}
