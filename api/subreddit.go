@@ -84,7 +84,7 @@ func (s *SubredditService) PostToItem(ctx context.Context, p *Post) (*Item, erro
 	split := strings.Split(res.Request.URL.Path, ".")
 	if len(split) == 2 {
 		item.Extension = split[1]
-		item.Name = split[0]
+		item.Name = split[0][1:] // Skip the forward slash at the start
 	}
 
 	return item, nil

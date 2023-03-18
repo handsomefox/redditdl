@@ -97,7 +97,7 @@ func TestGetItems(t *testing.T) {
 		t.Fatal("unexpected length of items:", len(items), items)
 	}
 	item := items[0]
-	if item.Name != "Staring into the woods [3840x2160]" {
+	if item.Name != "05sk8tzriboa1" {
 		t.Fatal("unexpected name:", item.Name)
 	}
 	if item.Extension != "png" {
