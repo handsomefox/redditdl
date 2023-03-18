@@ -1,4 +1,4 @@
-package downloader
+package main
 
 import (
 	"errors"
@@ -58,16 +58,28 @@ func ChdirOrCreate(dir string, createDir bool) error {
 	return nil
 }
 
+type FilenameError struct {
+	err         error
+	explanation string
+}
+
+func (se *FilenameError) Error() string {
+	if se.err != nil {
+		return se.explanation + ": " + se.err.Error()
+	}
+	return se.explanation
+}
+
 // formatFilename ensures that the filename is valid for NTFS and has the right extension.
 func formatFilename(filename, extension string) (string, error) {
 	const MaxFilenameLength = 255 // This really only accounts for NTFS.
 
 	if filename == "" {
-		return "", fmt.Errorf("%w: filename can not be empty", ErrEmptyFileParams)
+		return "", &FilenameError{explanation: "filename can not be empty"}
 	}
 
 	if extension == "" {
-		return "", fmt.Errorf("%w: extension can not be empty", ErrEmptyFileParams)
+		return "", &FilenameError{explanation: "extension can not be empty"}
 	}
 
 	filename = removeForbiddenChars(filename)
@@ -79,7 +91,7 @@ func formatFilename(filename, extension string) (string, error) {
 		filename = filename[:requiredLength]
 	}
 
-	return fmt.Sprintf("%s.%s", filename, extension), nil
+	return filename + "." + extension, nil
 }
 
 // Most of the characters are forbidden on Windows only.
