@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"runtime"
+	"time"
 
 	"github.com/rs/zerolog/log"
 )
@@ -159,6 +160,7 @@ func (rs *RedditStreamer) run(ctx context.Context, results chan<- StreamResult, 
 				}
 			} else {
 				after = after2
+				time.Sleep(500 * time.Millisecond) // Don't spam reddit too much
 			}
 		}
 	}
@@ -168,7 +170,7 @@ func (rs *RedditStreamer) run(ctx context.Context, results chan<- StreamResult, 
 func (rs *RedditStreamer) fetchPost(ctx context.Context, after, subreddit string, results chan<- StreamResult) (string, error) {
 	opts := &RequestOptions{
 		After:     after,
-		Count:     10,
+		Count:     25,
 		Sorting:   rs.opts.Sort,
 		Timeframe: rs.opts.Timeframe,
 		Subreddit: subreddit,
