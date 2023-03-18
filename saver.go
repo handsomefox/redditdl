@@ -31,8 +31,8 @@ func NewSaver(args *AppArguments) *Saver {
 	return &Saver{
 		client:        api.DefaultClient(),
 		args:          args,
-		downloadQueue: make(chan *api.Post, 24),
-		saveQueue:     make(chan SaverItem, 24),
+		downloadQueue: make(chan *api.Post, 16),
+		saveQueue:     make(chan SaverItem, 8),
 		saved:         atomic.Int64{},
 		failed:        atomic.Int64{},
 	}
@@ -80,7 +80,7 @@ func (s *Saver) Run() error {
 	ctx := context.Background()
 	wg := new(sync.WaitGroup)
 
-	for i := 0; i < 24; i++ {
+	for i := 0; i < 32; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
