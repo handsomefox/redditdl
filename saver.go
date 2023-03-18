@@ -20,11 +20,16 @@ type SaverItem struct {
 }
 
 type Saver struct {
-	client                *api.Client
-	args                  *AppArguments
-	downloadQueue         chan *api.Post
-	saveQueue             chan SaverItem
-	queued, saved, failed atomic.Int64
+	client *api.Client
+	args   *AppArguments
+
+	downloadQueue chan *api.Post
+	saveQueue     chan SaverItem
+
+	skipped atomic.Int64
+	queued  atomic.Int64
+	saved   atomic.Int64
+	failed  atomic.Int64
 }
 
 func NewSaver(args *AppArguments) *Saver {
@@ -121,6 +126,7 @@ func (s *Saver) downloadLoop(ctx context.Context, wd string) {
 	for post := range s.downloadQueue {
 		if !s.isEligibleForSaving(post) {
 			log.Debug().Msg("skipped an item")
+			s.skipped.Add(1)
 			continue
 		}
 
@@ -166,20 +172,26 @@ func (s *Saver) progressLoop() {
 	log.Debug().Msg("started the progress loop")
 	var (
 		lastTotal = int64(0)
-		stringf   = "Download status: Queued=%d; Saved=%d; Failed=%d" // Specified format string for printing
-		print     = func(msg string) { log.Info().Msg(msg) }          // Function used for printing (by default, zerolog)
+		// Specified format string for printing
+		stringf = "Download status: Queued=%d; Saved=%d; Failed=%d; Skipped=%d"
+		// Function used for printing (by default, zerolog)
+		print = func(msg string) { log.Info().Msg(msg) }
 	)
 	if !s.args.VerboseLogging {
-		stringf = "Download status: Queued=%d; Saved=%d; Failed=%d\r" // if no logging will be done, we can take control and print in a single line.
-		print = func(msg string) { fmt.Print(msg) }                   // Use package fmt for carriage return working correctly
+		// if no logging will be done, we can take control and print in a single line.
+		stringf = "Download status: Queued=%d; Saved=%d; Failed=%d; Skipped=%d\r"
+		// Use package fmt for carriage return working correctly
+		print = func(msg string) { fmt.Print(msg) }
 	}
 	for {
 		saved := s.saved.Load()
 		failed := s.failed.Load()
 		queued := s.queued.Load()
-		if lastTotal < saved+failed+queued {
-			print(fmt.Sprintf(stringf, queued, saved, failed))
-			lastTotal = saved + failed + queued
+		skipped := s.skipped.Load()
+		total := s.saved.Load() + failed + queued + skipped
+		if lastTotal < total {
+			print(fmt.Sprintf(stringf, queued, saved, failed, skipped))
+			lastTotal = total
 		}
 		// No need to update all the time
 		time.Sleep(time.Millisecond + 500)
