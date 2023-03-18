@@ -106,14 +106,21 @@ func (s *Saver) Run() error {
 	}
 
 	for res := range stream {
-		if s.failed.Load()+s.saved.Load() >= s.args.MediaCount {
+		if s.totalWithoutSkipped() >= s.args.MediaCount {
 			terminate <- struct{}{}
 			break
 		}
 		if res.Error != nil {
-			log.Err(res.Error)
-			continue
+			if v, ok := res.Error.(api.StreamEOF); ok {
+				log.Err(v).Msg("end of stream reached")
+				terminate <- struct{}{}
+				break
+			} else {
+				log.Err(res.Error)
+				continue
+			}
 		}
+
 		s.downloadQueue <- res.Post
 	}
 
@@ -146,9 +153,13 @@ func (s *Saver) downloadLoop(ctx context.Context, wd string) {
 			continue
 		}
 
-		s.saveQueue <- SaverItem{
-			Data: item,
-			Path: filepath.Join(wd, post.Data.Subreddit, filename),
+		if s.totalWithoutSkipped() < s.args.MediaCount {
+			s.saveQueue <- SaverItem{
+				Data: item,
+				Path: filepath.Join(wd, post.Data.Subreddit, filename),
+			}
+		} else {
+			return
 		}
 
 		s.queued.Add(1)
@@ -250,4 +261,8 @@ func (s *Saver) isEligibleForSaving(p *api.Post) bool {
 	}
 
 	return true
+}
+
+func (s *Saver) totalWithoutSkipped() int64 {
+	return s.saved.Load() + s.failed.Load()
 }
