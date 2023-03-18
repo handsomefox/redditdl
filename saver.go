@@ -200,7 +200,7 @@ func (s *Saver) progressLoop() {
 		// Use package fmt for carriage return working correctly
 		print = func(msg string) { fmt.Print(msg) }
 	}
-	for {
+	for s.totalWithoutSkipped() < s.args.MediaCount {
 		saved := s.saved.Load()
 		failed := s.failed.Load()
 		queued := s.queued.Load()
