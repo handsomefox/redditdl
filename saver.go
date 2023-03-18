@@ -114,7 +114,7 @@ func (s *Saver) Run() error {
 	for res := range stream {
 		if s.totalWithoutSkipped() >= s.args.MediaCount {
 			terminate <- struct{}{}
-			break
+			return nil
 		}
 		if res.Error != nil {
 			if v, ok := res.Error.(api.StreamEOF); ok {
