@@ -119,41 +119,32 @@ func (s *Saver) downloadLoop(ctx context.Context, wd string) {
 	log.Debug().Msg("started the save loop")
 
 	for post := range s.downloadQueue {
-		if post.Type() != s.args.SubredditContentType {
-			log.Debug().
-				Str("want_content_type", s.args.SubredditContentType).
-				Str("got_content_type", post.Type()).
-				Msg("unexpected content_type")
-			continue
-		}
-		if s.args.SubredditContentType == "image" || s.args.SubredditContentType == "video" {
-			item, err := s.client.Subreddit.PostToItem(ctx, post)
-			if err != nil {
-				log.Err(err).Msg("failed to convert a post to an item")
-				s.failed.Add(1)
-				continue
-			}
-
-			// item path is:
-			// {working_directory}/{subreddit}/{item_name}.{item_extension}
-			filename, err := NewFormattedFilename(item.Name, item.Extension)
-			if err != nil {
-				log.Err(err).Str("item_name", item.Name).Msg("failed to save item")
-				s.failed.Add(1)
-				continue
-			}
-
-			s.saveQueue <- SaverItem{
-				Data: item,
-				Path: filepath.Join(wd, post.Data.Subreddit, filename),
-			}
-
-		} else {
+		if !s.isEligibleForSaving(post) {
 			log.Debug().Str("content_type", s.args.SubredditContentType).Msg("unexpected content type")
 			s.failed.Add(1)
 			continue
 		}
 
+		item, err := s.client.Subreddit.PostToItem(ctx, post)
+		if err != nil {
+			log.Err(err).Msg("failed to convert a post to an item")
+			s.failed.Add(1)
+			continue
+		}
+
+		// item path is:
+		// {working_directory}/{subreddit}/{item_name}.{item_extension}
+		filename, err := NewFormattedFilename(item.Name, item.Extension)
+		if err != nil {
+			log.Err(err).Str("item_name", item.Name).Msg("failed to save item")
+			s.failed.Add(1)
+			continue
+		}
+
+		s.saveQueue <- SaverItem{
+			Data: item,
+			Path: filepath.Join(wd, post.Data.Subreddit, filename),
+		}
 	}
 }
 
@@ -206,4 +197,42 @@ func (s *Saver) WriteFile(path string, b []byte) error {
 	log.Debug().Int("written_bytes", n).Str("path", path).Msg("wrote to disk")
 
 	return nil
+}
+
+// isEligibleForSaving checks if the post goes through all the specified parameters by the user.
+func (s *Saver) isEligibleForSaving(p *api.Post) bool {
+	if s.args.SubredditContentType != "both" {
+		if s.args.SubredditContentType != p.Type() {
+			log.Debug().
+				Str("want_content_type", s.args.SubredditContentType).
+				Str("got_content_type", p.Type()).
+				Msg("unexpected content_type")
+			return false
+		}
+	}
+
+	if s.args.SubredditContentType == "link" || s.args.SubredditContentType == "text" {
+		log.Debug().Str("content_type", s.args.SubredditContentType).Msg("unexpected content type")
+		return false
+	}
+
+	w, h := p.Dimensions()
+	if w < s.args.MediaWidth && h < s.args.MediaHeight {
+		log.Debug().Int("width", w).Int("height", h).Msg("unfit dimensions")
+		return false
+	}
+
+	if p.Data.Over18 && !s.args.SubredditShowNSFW {
+		log.Debug().Msg("filtered out NSFW")
+		return false
+	}
+
+	if s.args.MediaOrientation != "all" {
+		if s.args.MediaOrientation != p.Orientation() {
+			log.Debug().Msg("filtered out by orientation")
+			return false
+		}
+	}
+
+	return true
 }
