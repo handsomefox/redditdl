@@ -59,31 +59,33 @@ func (s *SubredditService) PostToItem(ctx context.Context, p *Post) (*Item, erro
 		return nil, err
 	}
 
-	var extension string
-
-	typ := p.Type()
-	if typ == "video" {
-		extension = "mp4"
-	} else if typ == "image" {
-		extension = "jpg"
-	} else if typ == "text" {
-		extension = "txt"
-	}
-
-	split := strings.Split(res.Request.URL.Path, ".")
-	if len(split) == 2 {
-		extension = split[1]
-	}
-
-	return &Item{
+	item := &Item{
 		Bytes:       b,
 		Name:        p.Title(),
-		Extension:   extension,
+		Extension:   "",
 		URL:         p.URL(),
 		Orientation: p.Orientation(),
 		Type:        p.Type(),
 		Width:       p.Width(),
 		Height:      p.Height(),
 		IsOver18:    p.Data.Over18,
-	}, nil
+	}
+
+	if p.Type() == "video" {
+		item.Extension = "mp4"
+	} else if p.Type() == "image" {
+		item.Extension = "jpg"
+	} else if p.Type() == "text" {
+		item.Extension = "txt"
+	} else {
+		item.Extension = "bin"
+	}
+
+	split := strings.Split(res.Request.URL.Path, ".")
+	if len(split) == 2 {
+		item.Extension = split[1]
+		item.Name = split[0]
+	}
+
+	return item, nil
 }
