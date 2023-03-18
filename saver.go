@@ -117,7 +117,7 @@ func (s *Saver) Run() error {
 			if v, ok := res.Error.(api.StreamEOF); ok {
 				log.Err(v).Msg("end of stream reached")
 				terminate <- struct{}{}
-				break
+				return nil
 			} else {
 				log.Err(res.Error)
 				continue
