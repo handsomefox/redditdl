@@ -159,7 +159,7 @@ func (s *Saver) downloadLoop(ctx context.Context, wd string) {
 			continue
 		}
 
-		if s.totalWithoutSkipped() < s.args.MediaCount && s.queued.Load() > 0 {
+		if s.totalWithoutSkipped() < s.args.MediaCount {
 			s.saveQueue <- SaverItem{
 				Data: item,
 				Path: filepath.Join(wd, strings.ToLower(post.Data.Subreddit), filename),
@@ -200,7 +200,7 @@ func (s *Saver) progressLoop() {
 		// Use package fmt for carriage return working correctly
 		print = func(msg string) { fmt.Print(msg) }
 	}
-	for s.totalWithoutSkipped() < s.args.MediaCount {
+	for s.totalWithoutSkipped() < s.args.MediaCount && s.queued.Load() > 0 {
 		saved := s.saved.Load()
 		failed := s.failed.Load()
 		queued := s.queued.Load()
