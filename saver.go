@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/handsomefox/redditdl/api"
+	"github.com/handsomefox/redditdl/stream"
 	"github.com/rs/zerolog/log"
 )
 
@@ -28,26 +29,17 @@ type Saver struct {
 	saved   atomic.Int64
 	failed  atomic.Int64
 
+	saveCh     chan SaverItem
+	downloadCh chan *api.Post
+
+	workerCount int
+	bufferSize  int
+
 	client *api.Client
 	args   *AppArguments
 }
 
-func NewSaver(args *AppArguments) *Saver {
-	return &Saver{
-		skipped: atomic.Int64{},
-		queued:  atomic.Int64{},
-		saved:   atomic.Int64{},
-		failed:  atomic.Int64{},
-		client:  api.DefaultClient(),
-		args:    args,
-	}
-}
-
-func (s *Saver) Run(ctx context.Context, workerCount int, bufferSize int) error {
-	if err := ChdirOrCreate(s.args.SaveDirectory, true); err != nil {
-		return err
-	}
-
+func NewSaver(args *AppArguments, workerCount int, bufferSize int) *Saver {
 	if bufferSize == 0 {
 		log.Debug().Msg("using unbuffered channels")
 	}
@@ -57,34 +49,42 @@ func (s *Saver) Run(ctx context.Context, workerCount int, bufferSize int) error 
 		workerCount = 1
 	}
 
-	subreddits, err := s.prepareSubreddits()
-	if err != nil {
+	return &Saver{
+		skipped:     atomic.Int64{},
+		queued:      atomic.Int64{},
+		saved:       atomic.Int64{},
+		failed:      atomic.Int64{},
+		saveCh:      make(chan SaverItem, bufferSize),
+		downloadCh:  make(chan *api.Post, bufferSize),
+		workerCount: workerCount,
+		bufferSize:  bufferSize,
+		client:      api.DefaultClient(),
+		args:        args,
+	}
+}
+
+func (s *Saver) Run(ctx context.Context) error {
+	if err := ChdirOrCreate(s.args.SaveDirectory, true); err != nil {
 		return err
 	}
-
-	saveQueue := make(chan SaverItem, bufferSize)
-	defer close(saveQueue)
-	go s.saveLoop(saveQueue)
 
 	wd, err := os.Getwd()
 	if err != nil {
 		return err
 	}
+	subreddits := s.prepareSubreddits(wd)
 
-	downloadQueue := make(chan *api.Post, bufferSize)
-	defer close(downloadQueue)
-	for i := 0; i < workerCount; i++ {
-		go s.downloadLoop(ctx, downloadQueue, saveQueue, wd)
+	s.saveCh = make(chan SaverItem, s.bufferSize)
+	defer close(s.saveCh)
+	go s.saveLoop()
+
+	s.downloadCh = make(chan *api.Post, s.bufferSize)
+	defer close(s.downloadCh)
+	for i := 0; i < s.workerCount; i++ {
+		go s.downloadLoop(ctx, wd)
 	}
 
-	streamer, err := api.NewRedditStreamer(s.client, s.argsAsOpts(), subreddits...)
-	if err != nil {
-		return err
-	}
-
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-	stream, moreCh, err := streamer.Stream(ctx, stopCh, bufferSize)
+	stream, err := stream.New(s.client, s.argsAsOpts(subreddits...), s.bufferSize)
 	if err != nil {
 		return err
 	}
@@ -93,29 +93,30 @@ func (s *Saver) Run(ctx context.Context, workerCount int, bufferSize int) error 
 		go s.progressLoop()
 	}
 
-	moreCh <- struct{}{}
-	for i := int64(0); i < s.args.MediaCount; i = s.saved.Load() {
-		result, ok := <-stream
+	results, err := stream.Start()
+	if err != nil {
+		return err
+	}
+
+	defer stream.Close()
+	for !stream.Continue() && s.saved.Load() < s.args.MediaCount {
+		res, ok := <-results
 		if !ok {
-			log.Debug().Msg("stream finished")
+			log.Info().Msg("stream has finished")
 			break
 		}
-
-		if err := result.Error; err != nil {
-			if errors.Is(err, api.ErrStreamEOF) {
-				log.Debug().Msg("worker finished")
-			}
-			if errors.Is(err, api.ErrStreamEnded) {
-				log.Debug().Msg("stream finished")
-				break
-			}
-			log.Err(err).Send()
+		if res == nil {
 			continue
 		}
-
-		downloadQueue <- result.Post
+		s.downloadCh <- res
 		s.queued.Add(1)
-		moreCh <- struct{}{}
+
+		if s.queued.Load() > 50%s.args.MediaCount+1 {
+			time.Sleep(500 * time.Millisecond)
+		}
+		if s.saved.Load() >= s.args.MediaCount {
+			break
+		}
 	}
 
 	if !s.args.VerboseLogging {
@@ -126,12 +127,7 @@ func (s *Saver) Run(ctx context.Context, workerCount int, bufferSize int) error 
 	return nil
 }
 
-func (s *Saver) prepareSubreddits() ([]string, error) {
-	wd, err := os.Getwd()
-	if err != nil {
-		return nil, err
-	}
-
+func (s *Saver) prepareSubreddits(wd string) []string {
 	subreddits := strings.Split(s.args.SubredditList, ",")
 	for i := 0; i < len(subreddits); i++ {
 		subreddits[i] = strings.TrimSpace(subreddits[i])
@@ -145,24 +141,25 @@ func (s *Saver) prepareSubreddits() ([]string, error) {
 			}
 		}
 	}
-
-	return subreddits, nil
+	return subreddits
 }
 
-func (s *Saver) argsAsOpts() api.Options {
-	return api.Options{
+func (s *Saver) argsAsOpts(subreddits ...string) stream.Options {
+	return stream.Options{
 		ContentType: s.args.SubredditContentType,
 		Sort:        s.args.SubredditSort,
 		Timeframe:   s.args.SubredditTimeframe,
+		Subreddits:  subreddits,
 		ShowNSFW:    s.args.ShowNSFW,
 	}
 }
 
-func (s *Saver) downloadLoop(ctx context.Context, downloadQueue <-chan *api.Post, saverQueue chan<- SaverItem, wd string) {
-	for post := range downloadQueue {
+func (s *Saver) downloadLoop(ctx context.Context, wd string) {
+	for post := range s.downloadCh {
 		if !s.isEligibleForSaving(post) {
 			log.Debug().Msg("skipped an item")
 			s.skipped.Add(1)
+			s.queued.Store(s.queued.Load() - 1)
 			continue
 		}
 
@@ -170,28 +167,28 @@ func (s *Saver) downloadLoop(ctx context.Context, downloadQueue <-chan *api.Post
 		if err != nil {
 			log.Err(err).Msg("failed to convert a post to an item")
 			s.failed.Add(1)
+			s.queued.Store(s.queued.Load() - 1)
 			continue
 		}
-
 		// item path is:
 		// {working_directory}/{subreddit}/{item_name}.{item_extension}
 		filename, err := NewFormattedFilename(item.Name, item.Extension)
 		if err != nil {
 			log.Err(err).Str("item_name", item.Name).Msg("failed to save item")
 			s.failed.Add(1)
+			s.queued.Store(s.queued.Load() - 1)
 			continue
 		}
-		if s.saved.Load() < s.args.MediaCount {
-			saverQueue <- SaverItem{
-				Data: item,
-				Path: filepath.Join(wd, strings.ToLower(post.Data.Subreddit), filename),
-			}
-		}
+		p := filepath.Join(wd, strings.ToLower(post.Data.Subreddit), filename)
+		s.saveCh <- SaverItem{Data: item, Path: p}
 	}
 }
 
-func (s *Saver) saveLoop(saveQueue <-chan SaverItem) {
-	for item := range saveQueue {
+func (s *Saver) saveLoop() {
+	for item := range s.saveCh {
+		if s.saved.Load() >= s.args.MediaCount {
+			continue
+		}
 		if err := s.WriteFile(item.Path, item.Data.Bytes); err != nil {
 			s.failed.Add(1)
 			log.Err(err).Msg("failed to write file to disk")
