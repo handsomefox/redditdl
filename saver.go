@@ -100,6 +100,7 @@ func (s *Saver) Run(ctx context.Context, workerCount int, bufferSize int) error 
 			log.Debug().Msg("stream finished")
 			break
 		}
+
 		if err := result.Error; err != nil {
 			if errors.Is(err, api.ErrStreamEOF) {
 				log.Debug().Msg("worker finished")
@@ -109,10 +110,11 @@ func (s *Saver) Run(ctx context.Context, workerCount int, bufferSize int) error 
 				break
 			}
 			log.Err(err).Send()
-		} else {
-			downloadQueue <- result.Post
-			s.queued.Add(1)
+			continue
 		}
+
+		downloadQueue <- result.Post
+		s.queued.Add(1)
 		moreCh <- struct{}{}
 	}
 
@@ -179,10 +181,11 @@ func (s *Saver) downloadLoop(ctx context.Context, downloadQueue <-chan *api.Post
 			s.failed.Add(1)
 			continue
 		}
-
-		saverQueue <- SaverItem{
-			Data: item,
-			Path: filepath.Join(wd, strings.ToLower(post.Data.Subreddit), filename),
+		if s.saved.Load() < s.args.MediaCount {
+			saverQueue <- SaverItem{
+				Data: item,
+				Path: filepath.Join(wd, strings.ToLower(post.Data.Subreddit), filename),
+			}
 		}
 	}
 }
