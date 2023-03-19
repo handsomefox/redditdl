@@ -199,18 +199,35 @@ func (s *Saver) saveLoop() {
 	}
 }
 
+type color uint8
+
+const (
+	Red    color = 31
+	Green  color = 32
+	Yellow color = 33
+	Blue   color = 34
+)
+
+func coloredString(c color, s string) string {
+	return "\x1B[" + fmt.Sprint(c) + "m" + s + "\033[0m"
+}
+
 func (s *Saver) progressLoop() {
 	var (
 		lastTotal = int64(0)
+		stringf   = "Download status: " +
+			coloredString(Blue, "Queued") + "=%d; " +
+			coloredString(Green, "Saved") + "=%d; " +
+			coloredString(Red, "Failed") + "=%d; " +
+			coloredString(Yellow, "Skipped") + "=%d;"
 		// Specified format string for printing
-		stringf = "Download status: Queued=%d; Saved=%d; Failed=%d; Skipped=%d"
 		// Function used for printing (by default, zerolog)
 		progprint = func(msg string) { log.Info().Msg(msg) }
 	)
 
 	if !s.args.VerboseLogging {
 		// if no logging will be done, we can take control and print in a single line.
-		stringf = "Download status: Queued=%d; Saved=%d; Failed=%d; Skipped=%d\r"
+		stringf += "\r"
 		// Use package fmt for carriage return working correctly
 		progprint = func(msg string) { fmt.Print(msg) }
 	}
@@ -227,7 +244,7 @@ func (s *Saver) progressLoop() {
 			lastTotal = total
 		}
 		// No need to update all the time
-		time.Sleep(time.Second * 1)
+		time.Sleep(time.Millisecond * 250)
 	}
 }
 
