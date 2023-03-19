@@ -8,6 +8,8 @@ import (
 	"net/url"
 	"os"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestGetPosts(t *testing.T) {
@@ -15,24 +17,18 @@ func TestGetPosts(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/r/wallpaper/", func(w http.ResponseWriter, r *http.Request) {
 		r.Header.Add("content-type", "application/json")
+
 		b, err := os.ReadFile("testdata/sample.json")
-		if err != nil {
-			t.Fatal(err)
-		}
+		assert.NoError(t, err)
+
 		var ps Posts
-		if err := json.Unmarshal(b, &ps); err != nil {
-			t.Fatal(err)
-		}
-		if err := json.NewEncoder(w).Encode(ps); err != nil {
-			t.Fatal(err)
-		}
+		assert.NoError(t, json.Unmarshal(b, &ps))
+		assert.NoError(t, json.NewEncoder(w).Encode(ps))
 	})
 	server := httptest.NewServer(mux)
 
 	urlA, err := url.Parse(server.URL)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	client := DefaultClient().WithBaseURL(urlA)
 	opts := &RequestOptions{
@@ -44,17 +40,9 @@ func TestGetPosts(t *testing.T) {
 	}
 
 	posts, _, err := client.Subreddit.GetPosts(context.TODO(), opts)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if len(posts) != 1 {
-		t.Fatal("unexpected decoded response")
-	}
-
-	if posts[0].Title() != "Staring into the woods [3840x2160]" {
-		t.Fatal("undexpected decoded title")
-	}
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(posts), "unexpected decoded response")
+	assert.Equal(t, "Staring into the woods [3840x2160]", posts[0].Title(), "unexpected decoded title")
 }
 
 func TestGetItems(t *testing.T) {
@@ -62,24 +50,18 @@ func TestGetItems(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/r/wallpaper/", func(w http.ResponseWriter, r *http.Request) {
 		r.Header.Add("content-type", "application/json")
+
 		b, err := os.ReadFile("testdata/sample.json")
-		if err != nil {
-			t.Fatal(err)
-		}
+		assert.NoError(t, err)
+
 		var ps Posts
-		if err := json.Unmarshal(b, &ps); err != nil {
-			t.Fatal(err)
-		}
-		if err := json.NewEncoder(w).Encode(ps); err != nil {
-			t.Fatal(err)
-		}
+		assert.NoError(t, json.Unmarshal(b, &ps))
+		assert.NoError(t, json.NewEncoder(w).Encode(ps))
 	})
 	server := httptest.NewServer(mux)
 
 	urlA, err := url.Parse(server.URL)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	client := DefaultClient().WithBaseURL(urlA)
 	opts := &RequestOptions{
@@ -91,36 +73,18 @@ func TestGetItems(t *testing.T) {
 	}
 
 	items, _, err := client.Subreddit.GetItems(context.TODO(), opts)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
-	if len(items) != 1 {
-		t.Fatal("unexpected length of items:", len(items), items)
-	}
+	assert.Equal(t, 1, len(items), "unexpected length of items")
+
 	item := items[0]
-	if item.Name != "05sk8tzriboa1" {
-		t.Fatal("unexpected name:", item.Name)
-	}
-	if item.Extension != "png" {
-		t.Fatal("unexpected extension:", item.Extension)
-	}
-	if item.Height != 3840 {
-		t.Fatal("unexpected height:", item.Height)
-	}
-	if item.Width != 6656 {
-		t.Fatal("unexpected width:", item.Width)
-	}
-	if item.IsOver18 != false {
-		t.Fatal("unexpected IsOver18:", item.IsOver18)
-	}
-	if item.Orientation != "landscape" {
-		t.Fatal("unexpected orientation:", item.Orientation)
-	}
-	if item.URL != "https://i.redd.it/05sk8tzriboa1.png" {
-		t.Fatal("unexpected url:", item.URL)
-	}
-	if item.Type != "image" {
-		t.Fatal("unexpected type:", item.Type)
-	}
+
+	assert.Equal(t, "05sk8tzriboa1", item.Name, "unexpected name")
+	assert.Equal(t, "png", item.Extension, "unexpected extension")
+	assert.Equal(t, 3840, item.Height, "unexpected height")
+	assert.Equal(t, 6656, item.Width, "unexpected width")
+	assert.Equal(t, false, item.IsOver18, "unexpected IsOver18")
+	assert.Equal(t, "landscape", item.Orientation, "unexpected orientation")
+	assert.Equal(t, "https://i.redd.it/05sk8tzriboa1.png", item.URL, "unexpected url")
+	assert.Equal(t, "image", item.Type, "unexpected type")
 }

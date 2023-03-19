@@ -4,6 +4,8 @@ import (
 	"os"
 	"path"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestNewFilename(t *testing.T) {
@@ -57,13 +59,8 @@ func TestNewFilename(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			got, err := NewFormattedFilename(tt.args.name, tt.args.extension)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("NewFilename() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if got != tt.want {
-				t.Errorf("NewFilename() = %v, want %v", got, tt.want)
-			}
+			assert.Equal(t, tt.wantErr, err != nil)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -71,9 +68,7 @@ func TestNewFilename(t *testing.T) {
 func TestExists(t *testing.T) {
 	t.Parallel()
 	exec, err := os.Executable()
-	if err != nil {
-		t.Fatalf("couldn't find the running executable")
-	}
+	assert.NoError(t, err, "couldn't find the running executable")
 	type args struct {
 		filename string
 	}
@@ -101,9 +96,7 @@ func TestExists(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			if got := FileExists(tt.args.filename); got != tt.want {
-				t.Errorf("Exists() = %v, want %v", got, tt.want)
-			}
+			assert.Equal(t, tt.want, FileExists(tt.args.filename))
 		})
 	}
 }
@@ -146,9 +139,8 @@ func TestNavigateTo(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			if err := ChdirOrCreate(tt.args.dir, tt.args.createDir); (err != nil) != tt.wantErr {
-				t.Errorf("NavigateTo() error = %v, wantErr %v", err, tt.wantErr)
-			}
+			err := ChdirOrCreate(tt.args.dir, tt.args.createDir)
+			assert.Equal(t, tt.wantErr, err != nil)
 		})
 	}
 }

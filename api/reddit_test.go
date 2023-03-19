@@ -8,24 +8,19 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
-	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestBaseURL(t *testing.T) {
 	t.Parallel()
 	_, err := url.Parse(defaultBaseURL)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 	_, err = url.Parse(defaultBaseImageURL)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 	_, err = url.Parse(defaultBaseVideoURL)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 }
 
 func TestURLFormatting(t *testing.T) {
@@ -42,9 +37,7 @@ func TestURLFormatting(t *testing.T) {
 		c   = DefaultClient()
 		res = c.optsURL(opts)
 	)
-	if res != correct {
-		t.Fatal("incorrect formatting url, want:", correct, "got:", res)
-	}
+	assert.Equal(t, correct, res, "incorrect url format")
 }
 
 func TestGetURL(t *testing.T) {
@@ -56,19 +49,13 @@ func TestGetURL(t *testing.T) {
 	)
 
 	res, err := c.GetURL(context.TODO(), p.URL())
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 	defer res.Body.Close()
 
 	b2, err := io.ReadAll(res.Body)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
-	if !reflect.DeepEqual(b, b2) {
-		t.Fatal("couldn't correctly fetch the image data")
-	}
+	assert.Equal(t, b, b2, "couldn't correctly fetch the image data")
 }
 
 func TestGetImageByURL(t *testing.T) {
@@ -80,57 +67,40 @@ func TestGetImageByURL(t *testing.T) {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path[1:] != str {
-			t.Fatal("unexpected filename, want:", str, "got:", r.URL.Path[1:])
-		}
+		assert.Equal(t, str, r.URL.Path[1:], "unexpected filename")
 		_, err := w.Write(b)
-		if err != nil {
-			t.Fatal(err)
-		}
+		assert.NoError(t, err)
 	})
 	server := httptest.NewServer(mux)
 	u, err := url.Parse(server.URL)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	imgURL, err := url.Parse(p.URL())
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 	imgURL.Scheme = "http"
 
 	c := DefaultClient().WithBaseImageURL(u)
 
 	res, err := c.GetImageByURL(context.TODO(), imgURL.String())
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 	defer res.Body.Close()
 
 	b2, err := io.ReadAll(res.Body)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
-	if !reflect.DeepEqual(b, b2) {
-		t.Fatal("couldn't correctly fetch the image data")
-	}
+	assert.Equal(t, b, b2, "couldn't correctly fetch the image data")
 }
 
 func GetSavedPost(t *testing.T) Post {
 	t.Helper()
 	b, err := os.ReadFile("testdata/sample.json")
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
+
 	var ps Posts
-	if err := json.Unmarshal(b, &ps); err != nil {
-		t.Fatal(err)
-	}
-	if len(ps.Data.Children) != 1 {
-		t.Fatal("unexpected posts length:", len(ps.Data.Children))
-	}
+	err = json.Unmarshal(b, &ps)
+	assert.NoError(t, err)
+
+	assert.Equal(t, 1, len(ps.Data.Children))
 
 	return ps.Data.Children[0]
 }
@@ -138,8 +108,6 @@ func GetSavedPost(t *testing.T) Post {
 func GetSavedImage(t *testing.T) (b []byte, name string) {
 	t.Helper()
 	b, err := os.ReadFile("testdata/05sk8tzriboa1.png")
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 	return b, "05sk8tzriboa1.png"
 }

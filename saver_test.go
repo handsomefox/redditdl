@@ -6,18 +6,13 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestDownload(t *testing.T) {
 	t.Parallel()
 	args := defaultArgs(t.TempDir(), 1)
-	saver := NewSaver(args)
-
-	ctx := context.TODO()
-
-	if err := saver.Run(ctx, 1, 1); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, NewSaver(args).Run(context.TODO(), 1, 1))
 }
 
 func BenchmarkDownload10(b *testing.B) {
@@ -25,8 +20,7 @@ func BenchmarkDownload10(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		dir := b.TempDir()
 		args := defaultArgs(dir, 10)
-		saver := NewSaver(args)
-		if err := saver.Run(ctx, 1, 10); err != nil {
+		if err := NewSaver(args).Run(ctx, 1, 10); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -37,15 +31,14 @@ func BenchmarkDownload50(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		dir := b.TempDir()
 		args := defaultArgs(dir, 50)
-		saver := NewSaver(args)
-		if err := saver.Run(ctx, 1, 50); err != nil {
+		if err := NewSaver(args).Run(ctx, 1, 50); err != nil {
 			b.Fatal(err)
 		}
 	}
 }
 
 func defaultArgs(dir string, count int64) *AppArguments {
-	log.Logger = log.Level(zerolog.DebugLevel)
+	log.Logger = log.Level(zerolog.FatalLevel)
 	return &AppArguments{
 		SubredditContentType: "image",
 		SubredditSort:        "best",
