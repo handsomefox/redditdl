@@ -95,9 +95,7 @@ func (rs *RedditStreamer) Stream(ctx context.Context) (results <-chan StreamResu
 	go func() {
 		wg.Wait()
 		if !rs.end.Load() {
-			rs.stream <- StreamResult{
-				Error: ErrStreamEnded,
-			}
+			rs.stream <- StreamResult{Error: ErrStreamEnded}
 		}
 	}()
 
@@ -114,23 +112,31 @@ func (rs *RedditStreamer) End() {
 func (rs *RedditStreamer) run(ctx context.Context, subreddit string) {
 	after := ""
 
+	var posts []*Post
 	for range rs.continue_ {
-		if rs.end.Load() {
-			return
+		if len(posts) == 0 { // We have to do a fetch
+			fetched, after2, err := rs.fetchPost(ctx, 100, after, subreddit)
+			if err != nil {
+				rs.stream <- StreamResult{Error: err}
+				time.Sleep(500 * time.Millisecond) // Don't spam reddit too much
+				continue
+			} else {
+				after = after2
+				posts = fetched
+			}
 		}
-
-		after2, err := rs.fetchPost(ctx, int64(1), after, subreddit)
-		if err == nil {
-			after = after2
-			time.Sleep(500 * time.Millisecond) // Don't spam reddit too much
-			continue
+		// Otherwise, there's still posts to give
+		rs.stream <- StreamResult{
+			Error:     nil,
+			Post:      posts[0], // Give one
+			Subreddit: subreddit,
 		}
-		rs.stream <- StreamResult{Error: err}
+		posts = posts[1:] // Remove one
 	}
 }
 
 // fetchItem appends items to results chan, or, if there are no more items ("after is empty"), it returns a StreamError.
-func (rs *RedditStreamer) fetchPost(ctx context.Context, count int64, after, subreddit string) (string, error) {
+func (rs *RedditStreamer) fetchPost(ctx context.Context, count int64, after, subreddit string) ([]*Post, string, error) {
 	opts := &RequestOptions{
 		After:     after,
 		Count:     count,
@@ -141,23 +147,12 @@ func (rs *RedditStreamer) fetchPost(ctx context.Context, count int64, after, sub
 
 	res, after, err := rs.client.Subreddit.GetPosts(ctx, opts)
 	if err != nil {
-		return "", err
+		return nil, "", err
 	}
 
 	if len(res) == 0 {
-		return "", ErrStreamEOF
+		return nil, "", ErrStreamEOF
 	}
 
-	for i := 0; i < len(res); i++ {
-		if rs.end.Load() {
-			break
-		}
-		rs.stream <- StreamResult{
-			Post:      res[i],
-			Error:     nil,
-			Subreddit: subreddit,
-		}
-	}
-
-	return after, nil
+	return res, after, nil
 }
