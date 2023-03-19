@@ -11,6 +11,7 @@ import (
 )
 
 func TestGetPosts(t *testing.T) {
+	t.Parallel()
 	mux := http.NewServeMux()
 	mux.HandleFunc("/r/wallpaper/", func(w http.ResponseWriter, r *http.Request) {
 		r.Header.Add("content-type", "application/json")
@@ -57,6 +58,7 @@ func TestGetPosts(t *testing.T) {
 }
 
 func TestGetItems(t *testing.T) {
+	t.Parallel()
 	mux := http.NewServeMux()
 	mux.HandleFunc("/r/wallpaper/", func(w http.ResponseWriter, r *http.Request) {
 		r.Header.Add("content-type", "application/json")
@@ -121,5 +123,4 @@ func TestGetItems(t *testing.T) {
 	if item.Type != "image" {
 		t.Fatal("unexpected type:", item.Type)
 	}
-	_ = items
 }

@@ -67,6 +67,7 @@ func (se *FilenameError) Error() string {
 	if se.err != nil {
 		return se.explanation + ": " + se.err.Error()
 	}
+
 	return se.explanation
 }
 
@@ -75,11 +76,17 @@ func formatFilename(filename, extension string) (string, error) {
 	const MaxFilenameLength = 255 // This really only accounts for NTFS.
 
 	if filename == "" {
-		return "", &FilenameError{explanation: "filename can not be empty"}
+		return "", &FilenameError{
+			err:         nil,
+			explanation: "filename can not be empty",
+		}
 	}
 
 	if extension == "" {
-		return "", &FilenameError{explanation: "extension can not be empty"}
+		return "", &FilenameError{
+			err:         nil,
+			explanation: "extension can not be empty",
+		}
 	}
 
 	filename = removeForbiddenChars(filename)
@@ -94,16 +101,16 @@ func formatFilename(filename, extension string) (string, error) {
 	return filename + "." + extension, nil
 }
 
-// Most of the characters are forbidden on Windows only.
-var forbiddenChars = []rune{
-	'#', '%', '&', '{', '}', '\\', '<', '>', '*', '?', '/', '$',
-	'!', '\'', '"', ':', '@', '+', '`', '|', '=',
-}
-
 // removeForbiddenChars removes invalid characters for Linux/Windows filenames.
 func removeForbiddenChars(name string) string {
+	// Most of the characters are forbidden on Windows only.
+	forbiddenChars := []rune{
+		'#', '%', '&', '{', '}', '\\', '<', '>', '*', '?', '/', '$',
+		'!', '\'', '"', ':', '@', '+', '`', '|', '=',
+	}
 	for _, c := range forbiddenChars {
 		name = strings.ReplaceAll(name, string(c), "")
 	}
+
 	return name
 }

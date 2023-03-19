@@ -12,6 +12,21 @@ type SubredditService struct {
 	client *Client
 }
 
+type Item struct {
+	Name        string
+	Extension   string
+	URL         string
+	Orientation string
+	Type        string
+
+	Bytes []byte
+
+	Width  int
+	Height int
+
+	IsOver18 bool
+}
+
 func (s *SubredditService) GetPosts(ctx context.Context, opts *RequestOptions) ([]*Post, string, error) {
 	res, err := s.client.Do(ctx, opts, http.MethodGet, http.NoBody)
 	if err != nil {
@@ -71,13 +86,14 @@ func (s *SubredditService) PostToItem(ctx context.Context, p *Post) (*Item, erro
 		IsOver18:    p.Data.Over18,
 	}
 
-	if p.Type() == "video" {
+	switch p.Type() {
+	case "video":
 		item.Extension = "mp4"
-	} else if p.Type() == "image" {
+	case "image":
 		item.Extension = "jpg"
-	} else if p.Type() == "text" {
+	case "text":
 		item.Extension = "txt"
-	} else {
+	default:
 		item.Extension = "bin"
 	}
 

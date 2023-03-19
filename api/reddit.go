@@ -17,7 +17,7 @@ const (
 	defaultBaseImageURL = "https://i.redd.it"
 )
 
-// This is the client used to make requests in RedditStreamer.Stream()
+// This is the client used to make requests in RedditStreamer.Stream().
 type Client struct {
 	Subreddit *SubredditService
 
@@ -50,10 +50,10 @@ func (c *Client) WithBaseImageURL(u *url.URL) *Client {
 
 type RequestOptions struct {
 	After     string
-	Count     int64
 	Sorting   string
 	Timeframe string
 	Subreddit string
+	Count     int64
 }
 
 func (c *Client) Do(ctx context.Context, opts *RequestOptions, method string, body io.Reader) (*http.Response, error) {

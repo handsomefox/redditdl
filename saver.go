@@ -25,26 +25,28 @@ type SaverItem struct {
 }
 
 type Saver struct {
+	skipped atomic.Int64
+	queued  atomic.Int64
+	saved   atomic.Int64
+	failed  atomic.Int64
+
 	client *api.Client
 	args   *AppArguments
 
 	downloadQueue chan *api.Post
 	saveQueue     chan SaverItem
-
-	skipped atomic.Int64
-	queued  atomic.Int64
-	saved   atomic.Int64
-	failed  atomic.Int64
 }
 
 func NewSaver(args *AppArguments) *Saver {
 	return &Saver{
+		skipped:       atomic.Int64{},
+		queued:        atomic.Int64{},
+		saved:         atomic.Int64{},
+		failed:        atomic.Int64{},
 		client:        api.DefaultClient(),
 		args:          args,
 		downloadQueue: make(chan *api.Post, 16),
 		saveQueue:     make(chan SaverItem, 8),
-		saved:         atomic.Int64{},
-		failed:        atomic.Int64{},
 	}
 }
 
@@ -109,11 +111,12 @@ func (s *Saver) Run(ctx context.Context) error {
 		}
 
 		if err := res.Error; err != nil {
-			if _, ok := err.(api.StreamEOF); ok {
+
+			if errors.Is(err, api.ErrStreamEOF) {
 				log.Debug().Msg("worker finished")
 			}
 
-			if _, ok := err.(api.StreamEnded); ok {
+			if errors.Is(err, api.ErrStreamEnded) {
 				exit = true
 				streamer.End()
 				return nil
@@ -156,7 +159,7 @@ func (s *Saver) argsAsOpts() *api.Options {
 		ContentType: s.args.SubredditContentType,
 		Sort:        s.args.SubredditSort,
 		Timeframe:   s.args.SubredditTimeframe,
-		ShowNSFW:    s.args.SubredditShowNSFW,
+		ShowNSFW:    s.args.ShowNSFW,
 	}
 }
 
@@ -214,27 +217,31 @@ func (s *Saver) saveLoop() {
 func (s *Saver) progressLoop() {
 	// printProgressLoop prints the current progress of download every two seconds.
 	log.Debug().Msg("started the progress loop")
+
 	var (
 		lastTotal = int64(0)
 		// Specified format string for printing
 		stringf = "Download status: Queued=%d; Saved=%d; Failed=%d; Skipped=%d"
 		// Function used for printing (by default, zerolog)
-		print = func(msg string) { log.Info().Msg(msg) }
+		progprint = func(msg string) { log.Info().Msg(msg) }
 	)
+
 	if !s.args.VerboseLogging {
 		// if no logging will be done, we can take control and print in a single line.
 		stringf = "Download status: Queued=%d; Saved=%d; Failed=%d; Skipped=%d\r"
 		// Use package fmt for carriage return working correctly
-		print = func(msg string) { fmt.Print(msg) }
+		progprint = func(msg string) { fmt.Print(msg) }
 	}
+
 	for s.totalWithoutSkipped() < s.args.MediaCount {
 		saved := s.saved.Load()
 		failed := s.failed.Load()
 		queued := s.queued.Load()
 		skipped := s.skipped.Load()
 		total := s.saved.Load() + failed + queued + skipped
+
 		if lastTotal < total {
-			print(fmt.Sprintf(stringf, queued, saved, failed, skipped))
+			progprint(fmt.Sprintf(stringf, queued, saved, failed, skipped))
 			lastTotal = total
 		}
 		// No need to update all the time
@@ -286,12 +293,12 @@ func (s *Saver) isEligibleForSaving(p *api.Post) bool {
 	}
 
 	w, h := p.Dimensions()
-	if w < s.args.MediaWidth && h < s.args.MediaHeight {
+	if w < s.args.MediaMinimalWidth && h < s.args.MediaMinimalHeight {
 		log.Debug().Int("width", w).Int("height", h).Msg("unfit dimensions")
 		return false
 	}
 
-	if p.Data.Over18 && !s.args.SubredditShowNSFW {
+	if p.Data.Over18 && !s.args.ShowNSFW {
 		log.Debug().Msg("filtered out NSFW")
 		return false
 	}

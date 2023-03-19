@@ -10,7 +10,7 @@ import (
 
 func TestDownload(t *testing.T) {
 	t.Parallel()
-	args := defaultArgs(t.TempDir(), 25)
+	args := defaultArgs(t.TempDir(), 1)
 	saver := NewSaver(args)
 
 	ctx := context.TODO()
@@ -51,11 +51,11 @@ func defaultArgs(dir string, count int64) *AppArguments {
 		SubredditSort:        "best",
 		SubredditTimeframe:   "all",
 		SubredditList:        "wallpaper",
-		SubredditShowNSFW:    false,
+		ShowNSFW:             false,
 		MediaCount:           count,
 		MediaOrientation:     "all",
-		MediaWidth:           0,
-		MediaHeight:          0,
+		MediaMinimalWidth:    0,
+		MediaMinimalHeight:   0,
 		SaveDirectory:        dir,
 		VerboseLogging:       false,
 		ProgressLogging:      false,

@@ -13,6 +13,7 @@ import (
 )
 
 func TestBaseURL(t *testing.T) {
+	t.Parallel()
 	_, err := url.Parse(defaultBaseURL)
 	if err != nil {
 		t.Fatal(err)
@@ -28,6 +29,7 @@ func TestBaseURL(t *testing.T) {
 }
 
 func TestURLFormatting(t *testing.T) {
+	t.Parallel()
 	const correct = "https://reddit.com/r/example/best.json?after=&limit=10&t=all"
 	var (
 		opts = &RequestOptions{
@@ -46,6 +48,7 @@ func TestURLFormatting(t *testing.T) {
 }
 
 func TestGetURL(t *testing.T) {
+	t.Parallel()
 	var (
 		p    = GetSavedPost(t)
 		b, _ = GetSavedImage(t)
@@ -69,6 +72,7 @@ func TestGetURL(t *testing.T) {
 }
 
 func TestGetImageByURL(t *testing.T) {
+	t.Parallel()
 	var (
 		p      = GetSavedPost(t)
 		b, str = GetSavedImage(t)
@@ -90,15 +94,15 @@ func TestGetImageByURL(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	imgUrl, err := url.Parse(p.URL())
+	imgURL, err := url.Parse(p.URL())
 	if err != nil {
 		t.Fatal(err)
 	}
-	imgUrl.Scheme = "http"
+	imgURL.Scheme = "http"
 
 	c := DefaultClient().WithBaseImageURL(u)
 
-	res, err := c.GetImageByURL(context.TODO(), imgUrl.String())
+	res, err := c.GetImageByURL(context.TODO(), imgURL.String())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -131,7 +135,7 @@ func GetSavedPost(t *testing.T) *Post {
 	return ps.Data.Children[0]
 }
 
-func GetSavedImage(t *testing.T) ([]byte, string) {
+func GetSavedImage(t *testing.T) (b []byte, name string) {
 	t.Helper()
 	b, err := os.ReadFile("testdata/05sk8tzriboa1.png")
 	if err != nil {

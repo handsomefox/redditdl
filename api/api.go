@@ -19,15 +19,15 @@ type Post struct {
 		Media struct {
 			RedditVideo *Video `json:"reddit_video"`
 		} `json:"media"`
-		Title   string `json:"title"`
-		URL     string `json:"url"`
-		Preview struct {
-			Images []Image `json:"images"`
-		}
-		Over18    bool   `json:"over_18"`
-		IsVideo   bool   `json:"is_video"`
+		Title     string `json:"title"`
+		URL       string `json:"url"`
 		PostHint  string `json:"post_hint"`
 		Subreddit string `json:"subreddit"`
+		Preview   struct {
+			Images []Image `json:"images"`
+		}
+		Over18  bool `json:"over_18"`
+		IsVideo bool `json:"is_video"`
 	} `json:"data"`
 }
 

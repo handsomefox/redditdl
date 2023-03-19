@@ -2,9 +2,16 @@ package api
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"sync/atomic"
 	"time"
+)
+
+var (
+	ErrStreamError error = &StreamError{}
+	ErrStreamEOF         = errors.New("worker reached the end of it's stream")
+	ErrStreamEnded       = errors.New("stream is ended completely")
 )
 
 type Streamer interface {
@@ -12,25 +19,10 @@ type Streamer interface {
 	End()
 }
 
-type Item struct {
-	Bytes []byte
-
-	Name        string
-	Extension   string
-	URL         string
-	Orientation string
-	Type        string
-
-	Width  int
-	Height int
-
-	IsOver18 bool
-}
-
 type StreamResult struct {
-	Post      *Post
-	Subreddit string // Specifies from which subreddit the item came from (since multiple can be specified)
 	Error     error
+	Post      *Post
+	Subreddit string
 }
 
 type StreamError struct {
@@ -38,24 +30,11 @@ type StreamError struct {
 	explanation string
 }
 
-// Indicates that stream for the particular subreddit has finished.
-type StreamEOF string
-
-func (s StreamEOF) Error() string {
-	return string(s)
-}
-
-// Indicates that the whole stream has finished
-type StreamEnded string
-
-func (s StreamEnded) Error() string {
-	return string(s)
-}
-
 func (se *StreamError) Error() string {
 	if se.err != nil {
 		return se.explanation + ": " + se.err.Error()
 	}
+
 	return se.explanation
 }
 
@@ -67,20 +46,22 @@ type Options struct {
 }
 
 type RedditStreamer struct {
-	client     *Client
-	opts       *Options
-	subreddits []string
+	end atomic.Bool
+
+	client *Client
+	opts   *Options
 
 	stream    chan StreamResult
 	continue_ chan struct{}
 
-	end atomic.Bool
+	subreddits []string
 }
 
-func NewRedditStreamer(client *Client, opts *Options, subreddits ...string) (Streamer, error) {
+func NewRedditStreamer(client *Client, opts *Options, subreddits ...string) (*RedditStreamer, error) {
 	if len(subreddits) == 0 {
 		return nil, &StreamError{err: nil, explanation: "empty list of subreddits provided"}
 	}
+
 	rs := &RedditStreamer{
 		client:     client,
 		opts:       opts,
@@ -89,6 +70,7 @@ func NewRedditStreamer(client *Client, opts *Options, subreddits ...string) (Str
 		continue_:  make(chan struct{}),
 		end:        atomic.Bool{},
 	}
+
 	return rs, nil
 }
 
@@ -97,7 +79,7 @@ func NewRedditStreamer(client *Client, opts *Options, subreddits ...string) (Str
 // If the End() is called, it terminates.
 // If the streamer cannot continue, but continue is received, it will send a StreamResult continuing
 // StreamEOF error.
-func (rs *RedditStreamer) Stream(ctx context.Context) (<-chan StreamResult, chan<- struct{}, error) {
+func (rs *RedditStreamer) Stream(ctx context.Context) (results <-chan StreamResult, continue_ chan<- struct{}, err error) {
 	rs.end.Store(false)
 
 	wg := new(sync.WaitGroup)
@@ -109,11 +91,12 @@ func (rs *RedditStreamer) Stream(ctx context.Context) (<-chan StreamResult, chan
 			rs.run(ctx, s)
 		}()
 	}
+
 	go func() {
 		wg.Wait()
 		if !rs.end.Load() {
 			rs.stream <- StreamResult{
-				Error: StreamEnded("all workers have finished, this streamer is now useless"),
+				Error: ErrStreamEnded,
 			}
 		}
 	}()
@@ -130,19 +113,19 @@ func (rs *RedditStreamer) End() {
 
 func (rs *RedditStreamer) run(ctx context.Context, subreddit string) {
 	after := ""
+
 	for range rs.continue_ {
 		if rs.end.Load() {
 			return
 		}
+
 		after2, err := rs.fetchPost(ctx, int64(1), after, subreddit)
 		if err == nil {
 			after = after2
 			time.Sleep(500 * time.Millisecond) // Don't spam reddit too much
 			continue
 		}
-		rs.stream <- StreamResult{
-			Error: err,
-		}
+		rs.stream <- StreamResult{Error: err}
 	}
 }
 
@@ -162,7 +145,7 @@ func (rs *RedditStreamer) fetchPost(ctx context.Context, count int64, after, sub
 	}
 
 	if len(res) == 0 {
-		return "", StreamEOF("no more posts to read")
+		return "", ErrStreamEOF
 	}
 
 	for i := 0; i < len(res); i++ {
