@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"os"
 
 	"github.com/alexflint/go-arg"
@@ -49,12 +50,13 @@ func main() {
 
 	log.Debug().Any("app_arguments", args).Send()
 
-	if err := run(&args); err != nil {
+	ctx := context.Background()
+
+	if err := run(ctx, &args); err != nil {
 		log.Fatal().Err(err).Msg("error running the app")
 	}
-	log.Info().Msg("Finished downloading!")
 }
 
-func run(args *AppArguments) error {
-	return NewSaver(args).Run()
+func run(ctx context.Context, args *AppArguments) error {
+	return NewSaver(args).Run(ctx)
 }

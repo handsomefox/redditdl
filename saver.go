@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -47,7 +48,7 @@ func NewSaver(args *AppArguments) *Saver {
 	}
 }
 
-func (s *Saver) Run() error {
+func (s *Saver) Run(ctx context.Context) error {
 	if err := ChdirOrCreate(s.args.SaveDirectory, true); err != nil {
 		return err
 	}
@@ -55,6 +56,82 @@ func (s *Saver) Run() error {
 	wd, err := os.Getwd()
 	if err != nil {
 		return err
+	}
+
+	wg := new(sync.WaitGroup)
+	for i := 0; i < runtime.NumCPU(); i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			s.downloadLoop(ctx, wd)
+		}()
+	}
+	defer close(s.downloadQueue)
+
+	go s.saveLoop()
+	defer close(s.saveQueue)
+
+	opts := s.argsAsOpts()
+	log.Debug().Any("args", opts).Send()
+
+	subreddits, err := s.formatSubreddits()
+	if err != nil {
+		return err
+	}
+
+	streamer, err := api.NewRedditStreamer(s.client, opts, subreddits...)
+	if err != nil {
+		return err
+	}
+
+	stream, continue_, err := streamer.Stream(ctx)
+	if err != nil {
+		return err
+	}
+	defer streamer.End()
+
+	var exit bool // If exit is true, this goroutine stop asking for more to fetched.
+	go func() {
+		for s.totalWithoutSkipped() != s.args.MediaCount && !exit {
+			continue_ <- struct{}{}
+		}
+	}()
+
+	if s.args.ProgressLogging {
+		go s.progressLoop()
+	}
+
+	for res := range stream {
+		if s.totalWithoutSkipped() >= s.args.MediaCount && s.queued.Load() == 0 {
+			log.Info().Int64("total", s.saved.Load()).Msg("Finished downloading")
+			exit = true
+			return nil
+		}
+
+		if err := res.Error; err != nil {
+			if _, ok := err.(api.StreamEOF); ok {
+				log.Debug().Msg("worker finished")
+			}
+
+			if _, ok := err.(api.StreamEnded); ok {
+				exit = true
+				streamer.End()
+				return nil
+			}
+
+			log.Err(err).Send()
+		}
+
+		s.downloadQueue <- res.Post
+	}
+
+	return nil
+}
+
+func (s *Saver) formatSubreddits() ([]string, error) {
+	wd, err := os.Getwd()
+	if err != nil {
+		return nil, err
 	}
 
 	subreddits := strings.Split(s.args.SubredditList, ",")
@@ -71,66 +148,16 @@ func (s *Saver) Run() error {
 		}
 	}
 
-	if s.args.ProgressLogging {
-		go s.progressLoop()
-	}
+	return subreddits, nil
+}
 
-	opts := &api.Options{
+func (s *Saver) argsAsOpts() *api.Options {
+	return &api.Options{
 		ContentType: s.args.SubredditContentType,
 		Sort:        s.args.SubredditSort,
 		Timeframe:   s.args.SubredditTimeframe,
 		ShowNSFW:    s.args.SubredditShowNSFW,
 	}
-	log.Debug().Any("args", opts).Send()
-
-	streamer, err := api.NewRedditStreamer(s.client, opts, subreddits...)
-	if err != nil {
-		return err
-	}
-
-	ctx := context.Background()
-	wg := new(sync.WaitGroup)
-
-	for i := 0; i < 32; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			s.downloadLoop(ctx, wd)
-		}()
-	}
-	defer close(s.downloadQueue)
-
-	go s.saveLoop()
-	defer close(s.saveQueue)
-
-	terminate := make(chan struct{})
-	defer close(terminate)
-
-	stream, err := streamer.Stream(ctx, terminate)
-	if err != nil {
-		return err
-	}
-
-	for res := range stream {
-		if s.totalWithoutSkipped() >= s.args.MediaCount && s.queued.Load() == 0 {
-			terminate <- struct{}{}
-			return nil
-		}
-		if res.Error != nil {
-			if v, ok := res.Error.(api.StreamEOF); ok {
-				log.Err(v).Msg("end of stream reached")
-				terminate <- struct{}{}
-				return nil
-			} else {
-				log.Err(res.Error)
-				continue
-			}
-		}
-
-		s.downloadQueue <- res.Post
-	}
-
-	return nil
 }
 
 func (s *Saver) downloadLoop(ctx context.Context, wd string) {
@@ -200,7 +227,7 @@ func (s *Saver) progressLoop() {
 		// Use package fmt for carriage return working correctly
 		print = func(msg string) { fmt.Print(msg) }
 	}
-	for s.totalWithoutSkipped() < s.args.MediaCount && s.queued.Load() > 0 {
+	for s.totalWithoutSkipped() < s.args.MediaCount {
 		saved := s.saved.Load()
 		failed := s.failed.Load()
 		queued := s.queued.Load()
@@ -212,6 +239,9 @@ func (s *Saver) progressLoop() {
 		}
 		// No need to update all the time
 		time.Sleep(time.Millisecond + 500)
+	}
+	if !s.args.VerboseLogging {
+		fmt.Println()
 	}
 }
 
