@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"os"
+	"runtime"
 
 	"github.com/alexflint/go-arg"
 	"github.com/rs/zerolog"
@@ -60,5 +61,5 @@ func main() {
 }
 
 func run(ctx context.Context, args *AppArguments) error {
-	return NewSaver(args).Run(ctx)
+	return NewSaver(args).Run(ctx, runtime.NumCPU(), runtime.NumCPU()*2)
 }

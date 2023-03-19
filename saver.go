@@ -9,9 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -32,61 +30,61 @@ type Saver struct {
 
 	client *api.Client
 	args   *AppArguments
-
-	downloadQueue chan *api.Post
-	saveQueue     chan SaverItem
 }
 
 func NewSaver(args *AppArguments) *Saver {
 	return &Saver{
-		skipped:       atomic.Int64{},
-		queued:        atomic.Int64{},
-		saved:         atomic.Int64{},
-		failed:        atomic.Int64{},
-		client:        api.DefaultClient(),
-		args:          args,
-		downloadQueue: make(chan *api.Post, 16),
-		saveQueue:     make(chan SaverItem, 8),
+		skipped: atomic.Int64{},
+		queued:  atomic.Int64{},
+		saved:   atomic.Int64{},
+		failed:  atomic.Int64{},
+		client:  api.DefaultClient(),
+		args:    args,
 	}
 }
 
-func (s *Saver) Run(ctx context.Context) error {
+func (s *Saver) Run(ctx context.Context, workerCount int, bufferSize int) error {
 	if err := ChdirOrCreate(s.args.SaveDirectory, true); err != nil {
 		return err
 	}
 
-	wd, err := os.Getwd()
-	if err != nil {
-		return err
+	if bufferSize == 0 {
+		log.Debug().Msg("using unbuffered channels")
 	}
 
-	wg := new(sync.WaitGroup)
-	for i := 0; i < runtime.NumCPU(); i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			s.downloadLoop(ctx, wd)
-		}()
+	if workerCount == 0 {
+		log.Debug().Msg("no worker count provided, falling back on 1")
+		workerCount = 1
 	}
-	defer close(s.downloadQueue)
-
-	go s.saveLoop()
-	defer close(s.saveQueue)
-
-	opts := s.argsAsOpts()
-	log.Debug().Any("args", opts).Send()
 
 	subreddits, err := s.prepareSubreddits()
 	if err != nil {
 		return err
 	}
 
-	streamer, err := api.NewRedditStreamer(s.client, opts, subreddits...)
+	saveQueue := make(chan SaverItem, bufferSize)
+	defer close(saveQueue)
+	go s.saveLoop(saveQueue)
+
+	wd, err := os.Getwd()
 	if err != nil {
 		return err
 	}
 
-	stream, cont, err := streamer.Stream(ctx)
+	downloadQueue := make(chan *api.Post, bufferSize)
+	defer close(downloadQueue)
+	for i := 0; i < workerCount; i++ {
+		go s.downloadLoop(ctx, downloadQueue, saveQueue, wd)
+	}
+
+	streamer, err := api.NewRedditStreamer(s.client, s.argsAsOpts(), subreddits...)
+	if err != nil {
+		return err
+	}
+
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	stream, moreCh, err := streamer.Stream(ctx, stopCh, bufferSize)
 	if err != nil {
 		return err
 	}
@@ -95,32 +93,34 @@ func (s *Saver) Run(ctx context.Context) error {
 		go s.progressLoop()
 	}
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		cont <- struct{}{}
-		for res := range stream {
-			if err := res.Error; err != nil {
-				if errors.Is(err, api.ErrStreamEOF) {
-					log.Debug().Msg("worker finished")
-				}
-				if errors.Is(err, api.ErrStreamEnded) {
-					break
-				}
-				log.Err(err).Send()
-			}
-			if s.totalWithoutSkipped() >= s.args.MediaCount {
-				break
-			} else {
-				s.downloadQueue <- res.Post
-				cont <- struct{}{}
-			}
+	moreCh <- struct{}{}
+	for i := int64(0); i < s.args.MediaCount; i = s.saved.Load() {
+		result, ok := <-stream
+		if !ok {
+			log.Debug().Msg("stream finished")
+			break
 		}
-	}()
+		if err := result.Error; err != nil {
+			if errors.Is(err, api.ErrStreamEOF) {
+				log.Debug().Msg("worker finished")
+			}
+			if errors.Is(err, api.ErrStreamEnded) {
+				log.Debug().Msg("stream finished")
+				break
+			}
+			log.Err(err).Send()
+		} else {
+			downloadQueue <- result.Post
+			s.queued.Add(1)
+		}
+		moreCh <- struct{}{}
+	}
 
-	wg.Wait()
-	streamer.End()
+	if !s.args.VerboseLogging {
+		fmt.Println()
+	}
 	log.Info().Int64("total", s.saved.Load()).Msg("Finished downloading")
+
 	return nil
 }
 
@@ -147,8 +147,8 @@ func (s *Saver) prepareSubreddits() ([]string, error) {
 	return subreddits, nil
 }
 
-func (s *Saver) argsAsOpts() *api.Options {
-	return &api.Options{
+func (s *Saver) argsAsOpts() api.Options {
+	return api.Options{
 		ContentType: s.args.SubredditContentType,
 		Sort:        s.args.SubredditSort,
 		Timeframe:   s.args.SubredditTimeframe,
@@ -156,10 +156,8 @@ func (s *Saver) argsAsOpts() *api.Options {
 	}
 }
 
-func (s *Saver) downloadLoop(ctx context.Context, wd string) {
-	log.Debug().Msg("started the save loop")
-
-	for post := range s.downloadQueue {
+func (s *Saver) downloadLoop(ctx context.Context, downloadQueue <-chan *api.Post, saverQueue chan<- SaverItem, wd string) {
+	for post := range downloadQueue {
 		if !s.isEligibleForSaving(post) {
 			log.Debug().Msg("skipped an item")
 			s.skipped.Add(1)
@@ -182,20 +180,15 @@ func (s *Saver) downloadLoop(ctx context.Context, wd string) {
 			continue
 		}
 
-		if s.totalWithoutSkipped() < s.args.MediaCount {
-			s.saveQueue <- SaverItem{
-				Data: item,
-				Path: filepath.Join(wd, strings.ToLower(post.Data.Subreddit), filename),
-			}
-			s.queued.Add(1)
-		} else {
-			return
+		saverQueue <- SaverItem{
+			Data: item,
+			Path: filepath.Join(wd, strings.ToLower(post.Data.Subreddit), filename),
 		}
 	}
 }
 
-func (s *Saver) saveLoop() {
-	for item := range s.saveQueue {
+func (s *Saver) saveLoop(saveQueue <-chan SaverItem) {
+	for item := range saveQueue {
 		if err := s.WriteFile(item.Path, item.Data.Bytes); err != nil {
 			s.failed.Add(1)
 			log.Err(err).Msg("failed to write file to disk")
@@ -207,9 +200,6 @@ func (s *Saver) saveLoop() {
 }
 
 func (s *Saver) progressLoop() {
-	// printProgressLoop prints the current progress of download every two seconds.
-	log.Debug().Msg("started the progress loop")
-
 	var (
 		lastTotal = int64(0)
 		// Specified format string for printing
@@ -237,10 +227,7 @@ func (s *Saver) progressLoop() {
 			lastTotal = total
 		}
 		// No need to update all the time
-		time.Sleep(time.Millisecond + 500)
-	}
-	if !s.args.VerboseLogging {
-		fmt.Println()
+		time.Sleep(time.Second * 1)
 	}
 }
 
@@ -269,6 +256,9 @@ func (s *Saver) WriteFile(path string, b []byte) error {
 
 // isEligibleForSaving checks if the post goes through all the specified parameters by the user.
 func (s *Saver) isEligibleForSaving(p *api.Post) bool {
+	if p == nil {
+		return false
+	}
 	if s.args.SubredditContentType != "both" {
 		if s.args.SubredditContentType != p.Type() {
 			log.Debug().

@@ -9,8 +9,8 @@ import (
 
 type Posts struct {
 	Data struct {
-		After    string  `json:"after"`
-		Children []*Post `json:"children"`
+		After    string `json:"after"`
+		Children []Post `json:"children"`
 	} `json:"data"`
 }
 

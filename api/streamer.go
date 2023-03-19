@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"errors"
-	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -13,11 +12,6 @@ var (
 	ErrStreamEOF         = errors.New("worker reached the end of it's stream")
 	ErrStreamEnded       = errors.New("stream is ended completely")
 )
-
-type Streamer interface {
-	Stream(ctx context.Context) (<-chan StreamResult, chan<- struct{}, error)
-	End()
-}
 
 type StreamResult struct {
 	Error     error
@@ -46,78 +40,84 @@ type Options struct {
 }
 
 type RedditStreamer struct {
-	end atomic.Bool
-
 	client *Client
-	opts   *Options
+	opts   Options
 
-	stream    chan StreamResult
-	continue_ chan struct{}
+	workersFinished atomic.Int64
 
 	subreddits []string
 }
 
-func NewRedditStreamer(client *Client, opts *Options, subreddits ...string) (*RedditStreamer, error) {
+func NewRedditStreamer(client *Client, opts Options, subreddits ...string) (*RedditStreamer, error) {
 	if len(subreddits) == 0 {
 		return nil, &StreamError{err: nil, explanation: "empty list of subreddits provided"}
 	}
 
 	rs := &RedditStreamer{
-		client:     client,
-		opts:       opts,
-		subreddits: subreddits,
-		stream:     make(chan StreamResult, len(subreddits)),
-		continue_:  make(chan struct{}),
-		end:        atomic.Bool{},
+		client:          client,
+		opts:            opts,
+		workersFinished: atomic.Int64{},
+		subreddits:      subreddits,
 	}
 
 	return rs, nil
 }
 
-// Stream starts the stream, until the End() is called.
-// The streamer listens to the "continue" (chan struct{}) channel.
-// If the End() is called, it terminates.
-// If the streamer cannot continue, but continue is received, it will send a StreamResult continuing
-// StreamEOF error.
-func (rs *RedditStreamer) Stream(ctx context.Context) (results <-chan StreamResult, continue_ chan<- struct{}, err error) {
-	rs.end.Store(false)
+func (rs *RedditStreamer) Stream(ctx context.Context, stopCh <-chan struct{}, bufferSize int) (<-chan StreamResult, chan<- struct{}, error) {
+	// Channels for the consumer of Start()
+	resCh := make(chan StreamResult, bufferSize)
+	moreCh := make(chan struct{}, bufferSize)
 
-	wg := new(sync.WaitGroup)
-	wg.Add(len(rs.subreddits))
+	// Channels for signaling workers and aggregation
+	aggregateCh := make(chan StreamResult, bufferSize) // The items from workerLoop are stored here
+	workersMoreCh := make(chan struct{}, bufferSize)   // The workers listen to that channel, when they receive, they send item to the aggregateCh
+
+	workerCount := len(rs.subreddits)
+
 	for _, s := range rs.subreddits {
 		s := s
-		go func() {
-			defer wg.Done()
-			rs.run(ctx, s)
-		}()
+		go rs.workerLoop(ctx, s, workersMoreCh, aggregateCh)
 	}
 
 	go func() {
-		wg.Wait()
-		if !rs.end.Load() {
-			rs.stream <- StreamResult{Error: ErrStreamEnded}
+		defer close(resCh)
+		defer close(moreCh)
+		for {
+			select {
+			case <-stopCh: // If we stop, break out of the loop and let the closing functions run
+				return
+			case <-moreCh: // If we get asked by the consumer, ask the workers to get an item, then return the result
+				workersMoreCh <- struct{}{}
+				resCh <- <-aggregateCh
+			default:
+				// Here, we check if all the workers have exited
+				// If they did, report that the stream has ended.
+				// Workers will exit after the workersMoreCh is closed.
+				if rs.workersFinished.Load() == int64(workerCount) {
+					resCh <- StreamResult{Error: ErrStreamEnded}
+					return
+				}
+			}
 		}
 	}()
 
-	return rs.stream, rs.continue_, nil
+	return resCh, moreCh, nil
 }
 
-// Signals to the streamer to end.
-func (rs *RedditStreamer) End() {
-	rs.end.Store(true)
-	close(rs.stream)
-	close(rs.continue_)
-}
+// workerLoop listens on rs.moreCh and appends results to rs.resCh, if needed
+func (rs *RedditStreamer) workerLoop(ctx context.Context, subreddit string, moreCh <-chan struct{}, aggregateCh chan<- StreamResult) {
+	var (
+		after string
+		posts []Post
+	)
 
-func (rs *RedditStreamer) run(ctx context.Context, subreddit string) {
-	after := ""
+	defer rs.workersFinished.Add(1)
 
-	var posts []*Post
-	for range rs.continue_ {
+	for range moreCh {
 		if len(posts) == 0 { // We have to do a fetch
 			fetched, after2, err := rs.fetchPost(ctx, 100, after, subreddit)
 			if err != nil {
-				rs.stream <- StreamResult{Error: err}
+				aggregateCh <- StreamResult{Error: err}
 				time.Sleep(500 * time.Millisecond) // Don't spam reddit too much
 				continue
 			} else {
@@ -126,9 +126,9 @@ func (rs *RedditStreamer) run(ctx context.Context, subreddit string) {
 			}
 		}
 		// Otherwise, there's still posts to give
-		rs.stream <- StreamResult{
+		aggregateCh <- StreamResult{
 			Error:     nil,
-			Post:      posts[0], // Give one
+			Post:      &posts[0], // Give one
 			Subreddit: subreddit,
 		}
 		posts = posts[1:] // Remove one
@@ -136,7 +136,7 @@ func (rs *RedditStreamer) run(ctx context.Context, subreddit string) {
 }
 
 // fetchItem appends items to results chan, or, if there are no more items ("after is empty"), it returns a StreamError.
-func (rs *RedditStreamer) fetchPost(ctx context.Context, count int64, after, subreddit string) ([]*Post, string, error) {
+func (rs *RedditStreamer) fetchPost(ctx context.Context, count int64, after, subreddit string) ([]Post, string, error) {
 	opts := &RequestOptions{
 		After:     after,
 		Count:     count,

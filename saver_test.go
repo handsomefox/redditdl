@@ -15,7 +15,7 @@ func TestDownload(t *testing.T) {
 
 	ctx := context.TODO()
 
-	if err := saver.Run(ctx); err != nil {
+	if err := saver.Run(ctx, 1, 1); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -26,7 +26,7 @@ func BenchmarkDownload10(b *testing.B) {
 		dir := b.TempDir()
 		args := defaultArgs(dir, 10)
 		saver := NewSaver(args)
-		if err := saver.Run(ctx); err != nil {
+		if err := saver.Run(ctx, 1, 10); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -38,14 +38,14 @@ func BenchmarkDownload50(b *testing.B) {
 		dir := b.TempDir()
 		args := defaultArgs(dir, 50)
 		saver := NewSaver(args)
-		if err := saver.Run(ctx); err != nil {
+		if err := saver.Run(ctx, 1, 50); err != nil {
 			b.Fatal(err)
 		}
 	}
 }
 
 func defaultArgs(dir string, count int64) *AppArguments {
-	log.Logger = log.Level(zerolog.FatalLevel)
+	log.Logger = log.Level(zerolog.DebugLevel)
 	return &AppArguments{
 		SubredditContentType: "image",
 		SubredditSort:        "best",

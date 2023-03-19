@@ -118,7 +118,7 @@ func TestGetImageByURL(t *testing.T) {
 	}
 }
 
-func GetSavedPost(t *testing.T) *Post {
+func GetSavedPost(t *testing.T) Post {
 	t.Helper()
 	b, err := os.ReadFile("testdata/sample.json")
 	if err != nil {

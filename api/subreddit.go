@@ -27,7 +27,7 @@ type Item struct {
 	IsOver18 bool
 }
 
-func (s *SubredditService) GetPosts(ctx context.Context, opts *RequestOptions) ([]*Post, string, error) {
+func (s *SubredditService) GetPosts(ctx context.Context, opts *RequestOptions) ([]Post, string, error) {
 	res, err := s.client.Do(ctx, opts, http.MethodGet, http.NoBody)
 	if err != nil {
 		return nil, "", err
@@ -43,20 +43,20 @@ func (s *SubredditService) GetPosts(ctx context.Context, opts *RequestOptions) (
 }
 
 // GetItems return a slice of items, "after" string (consult reddit api), or an error.
-func (s *SubredditService) GetItems(ctx context.Context, opts *RequestOptions) ([]*Item, string, error) {
+func (s *SubredditService) GetItems(ctx context.Context, opts *RequestOptions) ([]Item, string, error) {
 	posts, after, err := s.GetPosts(ctx, opts)
 	if err != nil {
 		return nil, after, err
 	}
 
-	items := make([]*Item, 0, len(posts))
+	items := make([]Item, 0, len(posts))
 	for _, p := range posts {
 		p := p
-		item, err := s.PostToItem(ctx, p)
+		item, err := s.PostToItem(ctx, &p)
 		if err != nil {
 			return nil, after, err
 		}
-		items = append(items, item)
+		items = append(items, *item)
 	}
 
 	return items, after, nil
@@ -74,7 +74,7 @@ func (s *SubredditService) PostToItem(ctx context.Context, p *Post) (*Item, erro
 		return nil, err
 	}
 
-	item := &Item{
+	item := Item{
 		Bytes:       b,
 		Name:        p.Title(),
 		Extension:   "",
@@ -103,5 +103,5 @@ func (s *SubredditService) PostToItem(ctx context.Context, p *Post) (*Item, erro
 		item.Name = split[0][1:] // Skip the forward slash at the start
 	}
 
-	return item, nil
+	return &item, nil
 }
