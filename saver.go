@@ -294,7 +294,3 @@ func (s *Saver) isEligibleForSaving(p *api.Post) bool {
 
 	return true
 }
-
-func (s *Saver) totalWithoutSkipped() int64 {
-	return s.saved.Load() + s.failed.Load() + s.queued.Load()
-}
