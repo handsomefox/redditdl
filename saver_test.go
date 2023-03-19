@@ -12,7 +12,7 @@ import (
 func TestDownload(t *testing.T) {
 	t.Parallel()
 	args := defaultArgs(t.TempDir(), 1)
-	assert.NoError(t, NewSaver(args).Run(context.TODO(), 1, 1))
+	assert.NoError(t, NewSaver(args, 1, 1).Run(context.TODO()))
 }
 
 func BenchmarkDownload10(b *testing.B) {
@@ -20,7 +20,7 @@ func BenchmarkDownload10(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		dir := b.TempDir()
 		args := defaultArgs(dir, 10)
-		if err := NewSaver(args).Run(ctx, 1, 10); err != nil {
+		if err := NewSaver(args, 1, 10).Run(ctx); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -31,7 +31,7 @@ func BenchmarkDownload50(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		dir := b.TempDir()
 		args := defaultArgs(dir, 50)
-		if err := NewSaver(args).Run(ctx, 1, 50); err != nil {
+		if err := NewSaver(args, 1, 50).Run(ctx); err != nil {
 			b.Fatal(err)
 		}
 	}
