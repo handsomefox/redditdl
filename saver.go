@@ -76,7 +76,7 @@ func (s *Saver) Run(ctx context.Context) error {
 	opts := s.argsAsOpts()
 	log.Debug().Any("args", opts).Send()
 
-	subreddits, err := s.formatSubreddits()
+	subreddits, err := s.prepareSubreddits()
 	if err != nil {
 		return err
 	}
@@ -86,52 +86,45 @@ func (s *Saver) Run(ctx context.Context) error {
 		return err
 	}
 
-	stream, continue_, err := streamer.Stream(ctx)
+	stream, cont, err := streamer.Stream(ctx)
 	if err != nil {
 		return err
 	}
-	defer streamer.End()
-
-	var exit bool // If exit is true, this goroutine stop asking for more to fetched.
-	go func() {
-		for s.totalWithoutSkipped() != s.args.MediaCount && !exit {
-			continue_ <- struct{}{}
-		}
-	}()
 
 	if s.args.ProgressLogging {
 		go s.progressLoop()
 	}
 
-	for res := range stream {
-		if s.totalWithoutSkipped() >= s.args.MediaCount && s.queued.Load() == 0 {
-			log.Info().Int64("total", s.saved.Load()).Msg("Finished downloading")
-			exit = true
-			return nil
-		}
-
-		if err := res.Error; err != nil {
-
-			if errors.Is(err, api.ErrStreamEOF) {
-				log.Debug().Msg("worker finished")
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		cont <- struct{}{}
+		for res := range stream {
+			if err := res.Error; err != nil {
+				if errors.Is(err, api.ErrStreamEOF) {
+					log.Debug().Msg("worker finished")
+				}
+				if errors.Is(err, api.ErrStreamEnded) {
+					break
+				}
+				log.Err(err).Send()
 			}
-
-			if errors.Is(err, api.ErrStreamEnded) {
-				exit = true
-				streamer.End()
-				return nil
+			if s.totalWithoutSkipped() >= s.args.MediaCount {
+				break
+			} else {
+				s.downloadQueue <- res.Post
+				cont <- struct{}{}
 			}
-
-			log.Err(err).Send()
 		}
+	}()
 
-		s.downloadQueue <- res.Post
-	}
-
+	wg.Wait()
+	streamer.End()
+	log.Info().Int64("total", s.saved.Load()).Msg("Finished downloading")
 	return nil
 }
 
-func (s *Saver) formatSubreddits() ([]string, error) {
+func (s *Saver) prepareSubreddits() ([]string, error) {
 	wd, err := os.Getwd()
 	if err != nil {
 		return nil, err
@@ -194,11 +187,10 @@ func (s *Saver) downloadLoop(ctx context.Context, wd string) {
 				Data: item,
 				Path: filepath.Join(wd, strings.ToLower(post.Data.Subreddit), filename),
 			}
+			s.queued.Add(1)
 		} else {
 			return
 		}
-
-		s.queued.Add(1)
 	}
 }
 
@@ -233,7 +225,7 @@ func (s *Saver) progressLoop() {
 		progprint = func(msg string) { fmt.Print(msg) }
 	}
 
-	for s.totalWithoutSkipped() < s.args.MediaCount {
+	for s.saved.Load()+s.failed.Load() < s.args.MediaCount {
 		saved := s.saved.Load()
 		failed := s.failed.Load()
 		queued := s.queued.Load()
@@ -314,5 +306,5 @@ func (s *Saver) isEligibleForSaving(p *api.Post) bool {
 }
 
 func (s *Saver) totalWithoutSkipped() int64 {
-	return s.saved.Load() + s.failed.Load()
+	return s.saved.Load() + s.failed.Load() + s.queued.Load()
 }
