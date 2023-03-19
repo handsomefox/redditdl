@@ -61,5 +61,5 @@ func main() {
 }
 
 func run(ctx context.Context, args *AppArguments) error {
-	return NewSaver(args).Run(ctx, runtime.NumCPU(), runtime.NumCPU()*2)
+	return NewSaver(args, runtime.NumCPU(), runtime.NumCPU()*2).Run(ctx)
 }
