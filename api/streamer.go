@@ -113,9 +113,17 @@ func (rs *RedditStreamer) workerLoop(ctx context.Context, subreddit string, more
 
 	defer rs.workersFinished.Add(1)
 
+	// We can ignore the error on the first fetch, since we will check len anyway
+	fetched, after2, err := rs.fetchPost(ctx, 100, after, subreddit)
+	if err != nil {
+		fetched = nil
+	} else {
+		after = after2
+	}
+
 	for range moreCh {
 		if len(posts) == 0 { // We have to do a fetch
-			fetched, after2, err := rs.fetchPost(ctx, 100, after, subreddit)
+			fetched, after2, err = rs.fetchPost(ctx, 100, after, subreddit)
 			if err != nil {
 				aggregateCh <- StreamResult{Error: err}
 				time.Sleep(500 * time.Millisecond) // Don't spam reddit too much
