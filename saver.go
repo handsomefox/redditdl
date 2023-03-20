@@ -106,7 +106,9 @@ func (s *Saver) Run(ctx context.Context) error {
 		return err
 	}
 
-	defer stream.Close()
+	defer func() {
+		go stream.Close()
+	}()
 	for !stream.Continue() && s.saved.Load() < s.args.MediaCount {
 		res, ok := <-results
 		if !ok {
