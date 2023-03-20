@@ -7,7 +7,7 @@ build_linux:
 test:
 	go test -race -v -count=1 ./...
 bench:
-	go test ./... -bench=. -run=xxx -benchmem
+	go test -race -v ./... -bench=. -run=xxx -benchmem
 tidy:
 	go mod tidy
 vendor:
