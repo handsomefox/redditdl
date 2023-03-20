@@ -5,7 +5,7 @@ build_win:
 build_linux:
 	GOOS=linux go build --ldflags "-s -w" .
 test:
-	go test -race -v ./...
+	go test -race -v -count=1 ./...
 bench:
 	go test ./... -bench=. -run=xxx -benchmem
 tidy:
