@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -75,13 +76,20 @@ func (s *Saver) Run(ctx context.Context) error {
 	subreddits := s.prepareSubreddits(wd)
 
 	s.saveCh = make(chan SaverItem, s.bufferSize)
-	defer close(s.saveCh)
-	go s.saveLoop()
+	go func() {
+		defer close(s.saveCh)
+		s.saveLoop()
+	}()
 
 	s.downloadCh = make(chan *api.Post, s.bufferSize)
-	defer close(s.downloadCh)
+	once := new(sync.Once)
 	for i := 0; i < s.workerCount; i++ {
-		go s.downloadLoop(ctx, wd)
+		go func() {
+			defer once.Do(func() {
+				close(s.downloadCh)
+			})
+			s.downloadLoop(ctx, wd)
+		}()
 	}
 
 	stream, err := stream.New(s.client, s.argsAsOpts(subreddits...), s.bufferSize)
