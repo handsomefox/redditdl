@@ -26,6 +26,8 @@ type Stream struct {
 	workersDone atomic.Int32
 	completed   atomic.Bool
 
+	terminates []chan struct{}
+
 	opts Options
 }
 
@@ -35,12 +37,14 @@ func New(client *api.Client, options Options, bufferSize int) (*Stream, error) {
 	}
 
 	s := &Stream{
-		client:     client,
-		consumerCh: make(chan *api.Post, bufferSize),
-		continueCh: make(chan struct{}, bufferSize),
-		workers:    make([]Worker, 0, len(options.Subreddits)),
-		completed:  atomic.Bool{},
-		opts:       options,
+		client:      client,
+		consumerCh:  make(chan *api.Post, bufferSize),
+		continueCh:  make(chan struct{}, bufferSize),
+		workers:     make([]Worker, 0, len(options.Subreddits)),
+		workersDone: atomic.Int32{},
+		completed:   atomic.Bool{},
+		terminates:  nil,
+		opts:        options,
 	}
 
 	for i := 0; i < len(s.opts.Subreddits); i++ {
@@ -65,9 +69,12 @@ func (s *Stream) Start() (<-chan *api.Post, error) {
 
 // End reports to the stream that it has to end.
 func (s *Stream) Close() {
-	close(s.consumerCh)
-	close(s.continueCh)
+	for i := 0; i < len(s.terminates); i++ {
+		s.terminates[i] <- struct{}{}
+	}
 	s.completed.Store(true)
+	close(s.continueCh)
+	close(s.consumerCh)
 }
 
 // Continue reports to the stream that it has to fetch an item again.
@@ -88,10 +95,12 @@ func (s *Stream) Done() bool {
 func (s *Stream) spinupWorkers() {
 	for i := 0; i < len(s.workers); i++ {
 		i := i
+		terminate := make(chan struct{})
+		s.terminates = append(s.terminates, terminate)
 		// This improves performance if there's multiple subreddits
 		s.workers[i].tryPerformInitialFetch()
 		go func() {
-			_ = s.workers[i].Run(s.continueCh)
+			_ = s.workers[i].Run(s.continueCh, terminate)
 			s.workersDone.Add(1)
 		}()
 	}

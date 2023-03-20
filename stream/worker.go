@@ -24,26 +24,31 @@ type Worker struct {
 // Run loops over the provided channel, each receive triggers it to send an item to
 // the output channel.
 // When the Run() returns, it means that the worker can no longer fetch any items.
-func (w *Worker) Run(listenCh <-chan struct{}) struct{} {
+func (w *Worker) Run(listenCh <-chan struct{}, terminate <-chan struct{}) struct{} {
 	ctx := context.Background()
-	for range listenCh {
-		if len(w.currentItems) == 0 { // if there are no items
-			err := w.fetchItems(ctx) // fetch the items
-			if err != nil {
-				if !errors.Is(err, ErrWorkerEOF) {
-					w.outCh <- nil
-					continue
-				} else {
-					// There are no more items to fetch, report that we're done.
-					return struct{}{}
+
+	for {
+		select {
+		case <-listenCh:
+			if len(w.currentItems) == 0 { // if there are no items
+				err := w.fetchItems(ctx) // fetch the items
+				if err != nil {
+					if !errors.Is(err, ErrWorkerEOF) {
+						w.outCh <- nil
+						continue
+					} else {
+						// There are no more items to fetch, report that we're done.
+						return struct{}{}
+					}
 				}
 			}
+			// We can yield one item to the stream output.
+			w.outCh <- &w.currentItems[0]
+			w.currentItems = w.currentItems[1:]
+		case <-terminate:
+			return struct{}{}
 		}
-		// We can yield one item to the stream output.
-		w.outCh <- &w.currentItems[0]
-		w.currentItems = w.currentItems[1:]
 	}
-	return struct{}{}
 }
 
 func (w *Worker) fetchItems(ctx context.Context) error {
