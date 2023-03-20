@@ -9,9 +9,18 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestDownload(t *testing.T) {
-	t.Parallel()
+func TestDownload1(t *testing.T) {
 	args := defaultArgs(t.TempDir(), 1)
+	assert.NoError(t, NewSaver(args, 1, 1).Run(context.TODO()))
+}
+
+func TestDownload10(t *testing.T) {
+	args := defaultArgs(t.TempDir(), 10)
+	assert.NoError(t, NewSaver(args, 1, 1).Run(context.TODO()))
+}
+
+func TestDownload25(t *testing.T) {
+	args := defaultArgs(t.TempDir(), 25)
 	assert.NoError(t, NewSaver(args, 1, 1).Run(context.TODO()))
 }
 
