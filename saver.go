@@ -33,11 +33,11 @@ type Saver struct {
 	saveCh     chan SaverItem
 	downloadCh chan *api.Post
 
-	workerCount int
-	bufferSize  int
-
 	client *api.Client
 	args   *AppArguments
+
+	workerCount int
+	bufferSize  int
 }
 
 func NewSaver(args *AppArguments, workerCount int, bufferSize int) *Saver {
