@@ -119,11 +119,8 @@ func (s *Saver) Run(ctx context.Context) error {
 		s.downloadCh <- res
 		s.queued.Add(1)
 
-		if s.queued.Load() > 50%s.args.MediaCount+1 {
+		if s.queued.Load() > int64(s.bufferSize)+10 { // Worst-case, we will queue at least 10 items at a time.
 			time.Sleep(500 * time.Millisecond)
-		}
-		if s.saved.Load() >= s.args.MediaCount {
-			break
 		}
 	}
 
